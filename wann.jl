@@ -80,17 +80,21 @@ module WANN
 			for i in 1:length(pop.inds)
 				result = run(pop.inds[i], data)
 				n_sample = length(ans)
-				# println("result .- ans: ", result .- ans)
-				# println("sum(lost): ",sum(abs.(result .- ans)) / n_sample)
-				pop.inds[i].loss = sum(abs.(result .- ans)) / n_sample
+				println("data         : ", data)
+				println("result       : ", result)
+				println("ans          : ", ans)
+				println("result .- ans: ", result .- ans)
+				println("result .- ans: ", (result .- ans).^2)
+				println("sum(lost): ", sum((result .- ans).^2) / n_sample)
+				pop.inds[i].loss = sum((result .- ans).^2) / n_sample
 			end
 			sort!(pop.inds, lt = (a, b) -> a.loss < b.loss)
 			println("loss: ", pop.inds[1].loss, ", ",
 				pop.inds[2].loss, ", ",
 				pop.inds[3].loss, ", ",
 				pop.inds[4].loss)
-			newInds = [copy.(pop.inds[1:div(length(pop.inds), 2)])
-				copy.(pop.inds[1:div(length(pop.inds), 2)])] |> vcat
+			half_n = div(length(pop.inds), 2)
+			newInds = [copy.(pop.inds[1:half_n]); copy.(pop.inds[1:half_n])] |> vcat
 			# println("")
 			# for i in 1:length(pop.inds)
 			# 	println(pop.inds[i].w)
@@ -130,14 +134,20 @@ if abspath(PROGRAM_FILE) == @__FILE__
 	using LinearAlgebra: transpose!
 	using Flux: onehot
 	using Flux.Data.MNIST
+	using DataFrames # select
+	using CSV # read
 
 	function main()
-		in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
+		dataframe = CSV.read("data/sphere2.csv", header=true, delim=",")
+		in = convert(Matrix, select(dataframe, r"i"))
+		ans = convert(Matrix, select(dataframe, r"o"))
+		# in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
 		# ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;
 		#        0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;]
-		ans = [0.0 0.0; 0.0 1.0; 0.0 1.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 0.0 1.0; 1.0 1.0]
-		pop = WANN.Pop(2, 2, 4)
-		WANN.train(pop, in, ans, 100)
+		# ans = [0.0 0.0; 0.0 1.0; 0.0 1.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 0.0 1.0; 1.0 1.0]
+		# ans = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
+		pop = WANN.Pop(2, 1, 100)
+		WANN.train(pop, in, ans, 3)
 	end
 
 	main()

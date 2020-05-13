@@ -19,7 +19,7 @@ println("axes(labels): ", axes(labels))
 println("")
 
 pop = WANN.Pop(28^2, 10, nSample)
-WANN.train(pop, imgs, labels, 100)
+WANN.train(pop, imgs, labels, 10)
 
 # in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
 # ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;
