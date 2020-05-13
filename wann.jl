@@ -4,16 +4,18 @@ module WANN
 	include("./algorithm.jl")
 	export Ind, WANN
 
+	# individual
 	mutable struct Ind
 		nIn::Integer
 		nOut::Integer
 		loss::Float64
-		v::Array{Float64,2}
+		w::Array{Float64,2} # weight
+		a::Vector{<:Act} # activation function
 	end
 
 	function Base.getproperty(ind::Ind, sym::Symbol)
 		if sym === :nNode
-			return size(ind.v, 1)
+			return size(ind.w, 1)
 		elseif sym === :nHid
 			return ind.nNode - ind.nIn - 1 - ind.nOut
 		else
@@ -21,9 +23,9 @@ module WANN
 		end
 	end
 
-	copy(ind::Ind) = Ind(ind.nIn, ind.nOut, ind.loss, deepcopy(ind.v))
+	copy(ind::Ind) = Ind(ind.nIn, ind.nOut, ind.loss, deepcopy(ind.w), deepcopy(ind.a))
 
-	check_regal_matrix(ind::Ind) = check_regal_matrix(ind.v, ind.nIn + 1, ind.nHid)
+	check_regal_matrix(ind::Ind) = check_regal_matrix(ind.w, ind.nIn + 1, ind.nHid)
 
 	function Ind(nIn::Integer, nOut::Integer)
 		n = nIn + 1 + nOut
@@ -31,16 +33,19 @@ module WANN
 			nIn,
 			nOut,
 			2.0^64,
-			zeros(Float64, (n, n)))
-		ind.v = mutate_addconn(ind)
+			zeros(Float64, (n, n)),
+			[ActOrig() for _ in 1:n])
+		mutate_addconn!(ind)
 		return ind
 	end
 
-	mutate_addconn(ind::Ind)::Array{Float64, 2} =
-		mutate_addconn(ind.v, ind.nIn + 1, ind.nHid, ind.nOut)
+	function mutate_addconn!(ind::Ind)
+		ind.w, ind.a = mutate_addconn(ind.w, ind.a, ind.nIn + 1, ind.nHid, ind.nOut)
+	end
 
-	mutate_addnode(ind::Ind)::Array{Float64, 2} =
-		mutate_addnode(ind.v, ind.nIn + 1)
+	function mutate_addnode!(ind::Ind)
+		ind.w, ind.a = mutate_addnode(ind.w, ind.a, ind.nIn + 1)
+	end
 
 	function run(ind::Ind, input::Array{Float64, 2})
 		buff = zeros((axes(input, 1), ind.nNode))
@@ -50,9 +55,9 @@ module WANN
 		buff[:, 1] .= 1 # bias
 		buff[:, 2:ind.nIn+1] = input
 		for i = ind.nIn+2:ind.nNode
-			b = buff * ind.v[:, i]
-			# b = activation_function(b)
-			buff[:, i] = b
+			b = buff * ind.w[:, i]
+			# println(size(buff), size(ind.w[:, i]), size(b))
+			buff[:, i] = call(ind.a[i], b)
 		end
 		return buff[:, end-ind.nOut+1:end]
 	end
@@ -74,9 +79,10 @@ module WANN
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
 			for i in 1:length(pop.inds)
 				result = run(pop.inds[i], data)
+				n_sample = length(ans)
 				# println("result .- ans: ", result .- ans)
-				# println("sum(lost): ",sum(abs.(result .- ans)))
-				pop.inds[i].loss = sum(abs.(result .- ans))
+				# println("sum(lost): ",sum(abs.(result .- ans)) / n_sample)
+				pop.inds[i].loss = sum(abs.(result .- ans)) / n_sample
 			end
 			sort!(pop.inds, lt = (a, b) -> a.loss < b.loss)
 			println("loss: ", pop.inds[1].loss, ", ",
@@ -87,24 +93,24 @@ module WANN
 				copy.(pop.inds[1:div(length(pop.inds), 2)])] |> vcat
 			# println("")
 			# for i in 1:length(pop.inds)
-			# 	println(pop.inds[i].v)
+			# 	println(pop.inds[i].w)
 			# end
 			println("lost ", pop.inds[1].loss)
 			for i in 1:length(newInds)
 				r = rand()
 				if r < 0.5
 					# println(i, "addconn")
-					# println(newInds[i].v)
+					# println(newInds[i].w)
 					check_regal_matrix(newInds[i])
-					newInds[i].v = mutate_addconn(newInds[i])
-					# println_matrix(newInds[i].v)
+					mutate_addconn!(newInds[i])
+					# println_matrix(newInds[i].w)
 					check_regal_matrix(newInds[i])
 				elseif r < 0.6
 					# println(i, "addnode")
-					# println(newInds[i].v)
+					# println(newInds[i].w)
 					check_regal_matrix(newInds[i])
-					newInds[i].v = mutate_addnode(newInds[i])
-					# println_matrix(newInds[i].v)
+					mutate_addnode!(newInds[i])
+					# println_matrix(newInds[i].w)
 					check_regal_matrix(newInds[i])
 				end
 			end
@@ -112,7 +118,7 @@ module WANN
 			# println(typeof(newInds), axes(newInds))
 			# println("")
 			# for i in 1:length(newInds)
-			# 	println(newInds[i].v)
+			# 	println(newInds[i].w)
 			# end
 			pop.inds = newInds
 			println("")
