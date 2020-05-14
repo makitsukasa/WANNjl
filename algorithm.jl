@@ -241,7 +241,7 @@ function mutate_addnode(
 end
 
 function mutate_act(a::Vector{<:Act})
-	a[rand(length(a))].mutate()
+	a[rand(1:length(a))].mutate()
 	return a
 end
 
