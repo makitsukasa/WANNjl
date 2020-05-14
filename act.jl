@@ -23,7 +23,7 @@ function call(acts::Array{<:Act}, x::Array{<:AbstractFloat})
 end
 
 
-struct ActOrig <: Act
+mutable struct ActOrig <: Act
 	id::UInt
 end
 
