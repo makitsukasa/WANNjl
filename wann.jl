@@ -9,7 +9,7 @@ module WANN
 		nIn::Integer
 		nOut::Integer
 		loss::Float64
-		w::Matrix{Float64} # weight
+		w::Matrix{<:AbstractFloat} # weight
 		a::Vector{<:Act} # activation function
 	end
 
@@ -51,7 +51,7 @@ module WANN
 		ind.a = mutate_act(ind.a)
 	end
 
-	function run(ind::Ind, input::Matrix{Float64})
+	function calc_output(ind::Ind, input::Matrix{<:AbstractFloat}, shared_weight::AbstractFloat)
 		buff = zeros((axes(input, 1), ind.nNode))
 		# println("axes(buff): ", axes(buff))
 		# println("axes(buff[1, :]): ", axes(buff[:, 1]))
@@ -61,10 +61,34 @@ module WANN
 		for i = ind.nIn+2:ind.nNode
 			b = buff * ind.w[:, i]
 			# println(size(buff), size(ind.w[:, i]), size(b))
-			buff[:, i] = call(ind.a[i], b)
+			buff[:, i] = call(ind.a[i], b) * shared_weight
 		end
 		return buff[:, end-ind.nOut+1:end]
 	end
+
+	function calc_loss(
+			ind::Ind,
+			input::Matrix{<:AbstractFloat},
+			ans::Matrix{<:AbstractFloat},
+			shared_weights::Vector{<:AbstractFloat})
+		n_sample = length(ans)
+		n_run = length(shared_weights)
+		loss = 0.0
+		for w in shared_weights
+			result = calc_output(ind, input, w)
+			loss += sum((result .- ans).^2) / n_sample
+			# println("data         : ", data)
+			# println("result       : ", result)
+			# println("ans          : ", ans)
+			# println("result .- ans: ", result .- ans)
+			# println("result .- ans: ", (result .- ans).^2)
+			# println("sum(lost): ", sum((result .- ans).^2) / n_sample)
+		end
+		return loss / n_run
+	end
+
+	calc_loss(ind::Ind, input::Matrix{<:AbstractFloat}, ans::Matrix{<:AbstractFloat}) =
+		calc_loss(ind, input, ans, [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
 
 
 	mutable struct Pop
@@ -82,15 +106,7 @@ module WANN
 			println("gen ", i)
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
 			for i in 1:length(pop.inds)
-				result = run(pop.inds[i], data)
-				n_sample = length(ans)
-				println("data         : ", data)
-				println("result       : ", result)
-				println("ans          : ", ans)
-				println("result .- ans: ", result .- ans)
-				println("result .- ans: ", (result .- ans).^2)
-				println("sum(lost): ", sum((result .- ans).^2) / n_sample)
-				pop.inds[i].loss = sum((result .- ans).^2) / n_sample
+				pop.inds[i].loss = calc_loss(pop.inds[i], data, ans)
 			end
 			sort!(pop.inds, lt = (a, b) -> a.loss < b.loss)
 			println("loss: ", pop.inds[1].loss, ", ",
@@ -110,7 +126,12 @@ module WANN
 					# println(i, "addconn")
 					# println(newInds[i].w)
 					check_regal_matrix(newInds[i])
-					mutate_addconn!(newInds[i])
+					try
+						mutate_addconn!(newInds[i])
+					catch
+						println("no room")
+						r = 1
+					end
 					# println_matrix(newInds[i].w)
 					check_regal_matrix(newInds[i])
 				elseif r < 0.6
@@ -149,7 +170,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
 		pop = WANN.Pop(size(in, 2), size(ans, 2), 100)
-		WANN.train(pop, in, ans, 3)
+		WANN.train(pop, in, ans, 10)
 	end
 
 	main()
