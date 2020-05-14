@@ -56,6 +56,10 @@ function get_function(act::ActOrig)
 	end
 end
 
+function mutate(act::ActOrig)
+	act.id = rand(1:11)
+end
+
 if abspath(PROGRAM_FILE) == @__FILE__
 
 	function main()

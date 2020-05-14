@@ -9,7 +9,7 @@ module WANN
 		nIn::Integer
 		nOut::Integer
 		loss::Float64
-		w::Array{Float64,2} # weight
+		w::Matrix{Float64} # weight
 		a::Vector{<:Act} # activation function
 	end
 
@@ -47,7 +47,11 @@ module WANN
 		ind.w, ind.a = mutate_addnode(ind.w, ind.a, ind.nIn + 1)
 	end
 
-	function run(ind::Ind, input::Array{Float64, 2})
+	function mutate_act!(ind::Ind)
+		ind.a = mutate_act(ind.a)
+	end
+
+	function run(ind::Ind, input::Matrix{Float64})
 		buff = zeros((axes(input, 1), ind.nNode))
 		# println("axes(buff): ", axes(buff))
 		# println("axes(buff[1, :]): ", axes(buff[:, 1]))
@@ -116,6 +120,9 @@ module WANN
 					mutate_addnode!(newInds[i])
 					# println_matrix(newInds[i].w)
 					check_regal_matrix(newInds[i])
+				elseif r < 0.8
+					mutate_act!(newInds[i])
+					check_regal_matrix(newInds[i])
 				end
 			end
 			# println(typeof(pop.inds), axes(pop.inds))
@@ -141,12 +148,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 		dataframe = CSV.read("data/sphere2.csv", header=true, delim=",")
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
-		# in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
-		# ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;
-		#        0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;]
-		# ans = [0.0 0.0; 0.0 1.0; 0.0 1.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 0.0 1.0; 1.0 1.0]
-		# ans = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
-		pop = WANN.Pop(2, 1, 100)
+		pop = WANN.Pop(size(in, 2), size(ans, 2), 100)
 		WANN.train(pop, in, ans, 3)
 	end
 

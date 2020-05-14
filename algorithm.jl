@@ -240,6 +240,12 @@ function mutate_addnode(
 	return get_assigned_v(v, order, special), get_assigned_a(a, order)
 end
 
+function mutate_act(a::Vector{<:Act})
+	a[rand(length(a))].mutate()
+	return a
+end
+
+
 if abspath(PROGRAM_FILE) == @__FILE__
 	function main()
 		# for test
