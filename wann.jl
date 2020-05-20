@@ -82,20 +82,19 @@ module WANN
 			input::Matrix{<:T},
 			ans::Matrix{<:T},
 			shared_weights::Vector{<:T})::Vector{T} where T <: AbstractFloat
-		n_sample = length(ans)
 		n_run = length(shared_weights)
 		rewards = T[]
 		for w in shared_weights
 			result = calc_output(ind, input, w)
-			reward = -sum((result .- ans).^2) / n_sample
+			reward = -sum((result .- ans).^2)
 			append!(rewards, reward)
 			# println("input        : ", input)
-			# println("result       : ", result)
-			# println("ans          : ", ans)
-			# println("result .- ans: ", result .- ans)
-			# println("square       : ", (result .- ans).^2)
-			# println("sum          : ", sum((result .- ans).^2))
-			# println("reward       : ", reward)
+			println("result       : ", result)
+			println("ans          : ", ans)
+			println("result .- ans: ", result .- ans)
+			println("square       : ", (result .- ans).^2)
+			println("sum          : ", sum((result .- ans).^2))
+			println("reward       : ", reward)
 		end
 		return rewards
 	end
@@ -170,11 +169,14 @@ module WANN
 			println("gen ", i)
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
 			for i in 1:length(pop.inds)
-				pop.inds[i].rewards = calc_rewards(pop.inds[i], data, ans)
-				pop.inds[i].reward_avg = mean(pop.inds[i].rewards)
+				rewards = calc_rewards(pop.inds[i], data, ans)
+				pop.inds[i].reward_avg = mean(rewards)
+				pop.inds[i].rewards = deepcopy(rewards)
 			end
 			sort!(pop.inds, lt = (a, b) -> a.reward_avg < b.reward_avg)
-			println("reward ", pop.inds[end].reward_avg)
+			println("reward 1 ", pop.inds[end].reward_avg)
+			println("reward 2 ", pop.inds[end-1].reward_avg)
+			println("reward 3 ", pop.inds[end-2].reward_avg)
 			rank!(pop.inds)
 			n_pop = length(pop.inds)
 			parents = pop.inds

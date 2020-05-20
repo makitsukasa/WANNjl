@@ -3,19 +3,21 @@ using LinearAlgebra: transpose!
 using Flux: onehot
 using Flux.Data.MNIST
 
-nSample = 100
+n_sample = 100
+n_pop = 100
 
 # convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
-imgs = zeros(Float64, (nSample, 28^2))
-transpose!(imgs, hcat(vec.(float.(MNIST.images()))[1:nSample, :]...))
+imgs = zeros(Float64, (n_sample, 28^2))
+transpose!(imgs, hcat(vec.(float.(MNIST.images()))[1:n_sample, :]...))
 # convert Array{Int64,1} into Array{Flux.OneHotVector,2}
-hoge = map(x -> onehot(x, 0:9), MNIST.labels()[1:nSample, :])
-labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:nSample] for x = 1:10]...)
+hoge = map(x -> onehot(x, 0:9), MNIST.labels()[1:n_sample, :])
+labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_sample] for x = 1:10]...)
 
 println("typeof(imgs): ", typeof(imgs))
 println("axes(imgs): ", axes(imgs))
 println("typeof(labels): ", typeof(labels))
 println("axes(labels): ", axes(labels))
+println("labels: ", labels)
 println("")
 
 hyp = Dict(
@@ -25,7 +27,7 @@ hyp = Dict(
 	"prob_crossover" => 0.0
 )
 
-pop = WANN.Pop(28^2, 100, nSample)
+pop = WANN.Pop(28^2, 10, n_pop)
 WANN.train(pop, imgs, labels, 10, hyp)
 
 # in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
