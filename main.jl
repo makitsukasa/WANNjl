@@ -18,8 +18,15 @@ println("typeof(labels): ", typeof(labels))
 println("axes(labels): ", axes(labels))
 println("")
 
-pop = WANN.Pop(28^2, 10, nSample)
-WANN.train(pop, imgs, labels, 10)
+hyp = Dict(
+	"select_cull_ratio" => 0.2,
+	"select_elite_ratio"=> 0.2,
+	"select_tourn_size" => 32,
+	"prob_crossover" => 0.0
+)
+
+pop = WANN.Pop(28^2, 100, nSample)
+WANN.train(pop, imgs, labels, 10, hyp)
 
 # in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
 # ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;

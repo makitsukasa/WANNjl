@@ -1,16 +1,19 @@
 module WANN
 	using LinearAlgebra: dot
+	using Statistics: mean
 	using Flux
 	include("./algorithm.jl")
 	export Ind, WANN
 
 	# individual
 	mutable struct Ind
-		nIn::Integer
-		nOut::Integer
-		loss::Float64
-		w::Matrix{<:AbstractFloat} # weight
+		nIn::Int64
+		nOut::Int64
+		w::Matrix{Float64} # weight
 		a::Vector{<:Act} # activation function
+		rewards::Vector{Float64}
+		reward_avg::Float64
+		rank::Int64
 	end
 
 	function Base.getproperty(ind::Ind, sym::Symbol)
@@ -23,21 +26,29 @@ module WANN
 		end
 	end
 
-	copy(ind::Ind) = Ind(ind.nIn, ind.nOut, ind.loss, deepcopy(ind.w), deepcopy(ind.a))
+	Ind(nIn::Int64, nOut::Int64, w::Matrix{Float64}, a::Vector{<:Act}) =
+		Ind(nIn,
+			nOut,
+			deepcopy(w),
+			deepcopy(a),
+			Float64[],
+			NaN,
+			2^63-1)
 
-	check_regal_matrix(ind::Ind) = check_regal_matrix(ind.w, ind.nIn + 1, ind.nHid)
-
-	function Ind(nIn::Integer, nOut::Integer)
+	function Ind(nIn::Int64, nOut::Int64)
 		n = nIn + 1 + nOut
 		ind = Ind(
 			nIn,
 			nOut,
-			2.0^64,
-			zeros(Float64, (n, n)),
+			zeros(Float64, n, n),
 			[ActOrig() for _ in 1:n])
 		mutate_addconn!(ind)
 		return ind
 	end
+
+	copy(ind::Ind) = Ind(ind.nIn, ind.nOut, deepcopy(ind.w), deepcopy(ind.a))
+
+	check_regal_matrix(ind::Ind) = check_regal_matrix(ind.w, ind.nIn + 1, ind.nHid)
 
 	function mutate_addconn!(ind::Ind)
 		ind.w, ind.a = mutate_addconn(ind.w, ind.a, ind.nIn + 1, ind.nHid, ind.nOut)
@@ -58,7 +69,7 @@ module WANN
 		# println("axes(buff[2:ind.nIn+1, :]): ", axes(buff[:, 2:ind.nIn+1]))
 		buff[:, 1] .= 1 # bias
 		buff[:, 2:ind.nIn+1] = input
-		for i = ind.nIn+2:ind.nNode
+		for i in ind.nIn+2:ind.nNode
 			b = buff * ind.w[:, i]
 			# println(size(buff), size(ind.w[:, i]), size(b))
 			buff[:, i] = call(ind.a[i], b) * shared_weight
@@ -66,94 +77,145 @@ module WANN
 		return buff[:, end-ind.nOut+1:end]
 	end
 
-	function calc_loss(
+	function calc_rewards(
 			ind::Ind,
-			input::Matrix{<:AbstractFloat},
-			ans::Matrix{<:AbstractFloat},
-			shared_weights::Vector{<:AbstractFloat})
+			input::Matrix{<:T},
+			ans::Matrix{<:T},
+			shared_weights::Vector{<:T})::Vector{T} where T <: AbstractFloat
 		n_sample = length(ans)
 		n_run = length(shared_weights)
-		loss = 0.0
+		rewards = T[]
 		for w in shared_weights
 			result = calc_output(ind, input, w)
-			loss += sum((result .- ans).^2) / n_sample
-			# println("data         : ", data)
+			reward = -sum((result .- ans).^2) / n_sample
+			append!(rewards, reward)
+			# println("input        : ", input)
 			# println("result       : ", result)
 			# println("ans          : ", ans)
 			# println("result .- ans: ", result .- ans)
-			# println("result .- ans: ", (result .- ans).^2)
-			# println("sum(lost): ", sum((result .- ans).^2) / n_sample)
+			# println("square       : ", (result .- ans).^2)
+			# println("sum          : ", sum((result .- ans).^2))
+			# println("reward       : ", reward)
 		end
-		return loss / n_run
+		return rewards
 	end
 
-	calc_loss(ind::Ind, input::Matrix{<:AbstractFloat}, ans::Matrix{<:AbstractFloat}) =
-		calc_loss(ind, input, ans, [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
+	calc_rewards(ind::Ind, input::Matrix{<:AbstractFloat}, ans::Matrix{<:AbstractFloat}) =
+		calc_rewards(ind, input, ans, [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
+
+	function mutate!(ind::Ind)
+		r = rand()
+		if r < 0.5
+			# println(i, "addconn")
+			# println(ind.w)
+			check_regal_matrix(ind)
+			try
+				mutate_addconn!(ind)
+			catch
+				println("no room")
+				r = 1
+			end
+			# println_matrix(ind.w)
+			check_regal_matrix(ind)
+		elseif r < 0.6
+			# println(i, "addnode")
+			# println(ind.w)
+			check_regal_matrix(ind)
+			mutate_addnode!(ind)
+			# println_matrix(ind.w)
+			check_regal_matrix(ind)
+		elseif r < 0.8
+			mutate_act!(ind)
+			check_regal_matrix(ind)
+		end
+	end
+
+	function rank!(inds::Vector{Ind})
+		# Compile objectives
+		reward_avg = [ind.reward_avg for ind in inds]
+		reward_max = [maximum(ind.rewards) for ind in inds]
+		nConns = [length(findall(!iszero, ind.w)) for ind in inds]
+		objectives = hcat(reward_avg, reward_max, 1 ./ nConns) # Maximize
+		rank = non_dominated_sort(objectives)
+		for i in 1:length(rank)
+			inds[i].rank = rank[i]
+		end
+	end
 
 
 	mutable struct Pop
 		inds::Array{Ind}
 	end
 
-	copy(pop::Pop) = Pop(copy(pop.inds))
+	Base.getindex(pop::Pop, index) = getindex(pop.inds, index)
+
+	Base.copy(pop::Pop) = Pop(copy(pop.inds))
 
 	function Pop(nIn::Integer, nOut::Integer, size::Integer)
 		return Pop([Ind(nIn, nOut) for i = 1:size])
 	end
 
-	function train(pop::Pop, data, ans, loop)
+	function evolve_pop()
+
+	end
+
+	function mutate!(inds::Vector{<:Ind})
+		for i in 1:length(inds)
+			mutate!(i)
+		end
+	end
+
+	function train(pop::Pop, data, ans, loop, hyp)
 		for i = 1:loop
 			println("gen ", i)
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
 			for i in 1:length(pop.inds)
-				pop.inds[i].loss = calc_loss(pop.inds[i], data, ans)
+				pop.inds[i].rewards = calc_rewards(pop.inds[i], data, ans)
+				pop.inds[i].reward_avg = mean(pop.inds[i].rewards)
 			end
-			sort!(pop.inds, lt = (a, b) -> a.loss < b.loss)
-			println("loss: ", pop.inds[1].loss, ", ",
-				pop.inds[2].loss, ", ",
-				pop.inds[3].loss, ", ",
-				pop.inds[4].loss)
-			half_n = div(length(pop.inds), 2)
-			newInds = [copy.(pop.inds[1:half_n]); copy.(pop.inds[1:half_n])] |> vcat
-			# println("")
-			# for i in 1:length(pop.inds)
-			# 	println(pop.inds[i].w)
-			# end
-			println("lost ", pop.inds[1].loss)
-			for i in 1:length(newInds)
-				r = rand()
-				if r < 0.5
-					# println(i, "addconn")
-					# println(newInds[i].w)
-					check_regal_matrix(newInds[i])
-					try
-						mutate_addconn!(newInds[i])
-					catch
-						println("no room")
-						r = 1
-					end
-					# println_matrix(newInds[i].w)
-					check_regal_matrix(newInds[i])
-				elseif r < 0.6
-					# println(i, "addnode")
-					# println(newInds[i].w)
-					check_regal_matrix(newInds[i])
-					mutate_addnode!(newInds[i])
-					# println_matrix(newInds[i].w)
-					check_regal_matrix(newInds[i])
-				elseif r < 0.8
-					mutate_act!(newInds[i])
-					check_regal_matrix(newInds[i])
+			sort!(pop.inds, lt = (a, b) -> a.reward_avg < b.reward_avg)
+			println("reward ", pop.inds[end].reward_avg)
+			rank!(pop.inds)
+			n_pop = length(pop.inds)
+			parents = pop.inds
+			children = Vector{Ind}(undef, n_pop)
+
+			# Sort by rank
+			sort!(pop.inds, lt = (a, b) -> a.rank < b.rank)
+
+			# Cull  - eliminate worst individuals from breeding pool
+			parents = parents[1:end - floor(Int64, hyp["select_cull_ratio"] * n_pop)]
+
+			# Elitism - keep best individuals unchanged
+			n_elites = floor(Int64, hyp["select_elite_ratio"] * n_pop)
+			for i in 1:n_elites
+				children[i] = pop.inds[i]
+			end
+
+			# Get parent pairs via tournament selection
+			# -- As individuals are sorted by fitness, index comparison is
+			# enough. In the case of ties the first individual wins
+			n_generate = n_pop - n_elites
+			parentA = rand(1:n_pop, n_generate, hyp["select_tourn_size"])
+			parentB = rand(1:n_pop, n_generate, hyp["select_tourn_size"])
+			parents = transpose(hcat(minimum(parentA, dims=2), minimum(parentB, dims=2)))
+			sort!(parents, dims=1)
+
+			# Breed child population
+			for i in 1:n_generate
+				if rand() > hyp["prob_crossover"]
+					# Mutation only: take only highest fit parent
+					child = copy(pop[parents[1, i]])
+				else
+					# Crossover
+					throw(error("crossover is not impremented"))
 				end
+				mutate!(child)
+				children[n_elites + i] = child
 			end
-			# println(typeof(pop.inds), axes(pop.inds))
-			# println(typeof(newInds), axes(newInds))
-			# println("")
-			# for i in 1:length(newInds)
-			# 	println(newInds[i].w)
-			# end
-			pop.inds = newInds
-			println("")
+
+			pop.inds = children
+			continue
 		end
 	end
 end
@@ -167,10 +229,16 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
 	function main()
 		dataframe = CSV.read("data/sphere2.csv", header=true, delim=",")
+		hyp = Dict(
+			"select_cull_ratio" => 0.2,
+			"select_elite_ratio"=> 0.2,
+			"select_tourn_size" => 32,
+			"prob_crossover" => 0.0
+		)
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
 		pop = WANN.Pop(size(in, 2), size(ans, 2), 100)
-		WANN.train(pop, in, ans, 10)
+		WANN.train(pop, in, ans, 15, hyp)
 	end
 
 	main()
