@@ -35,14 +35,19 @@ module WANN
 			NaN,
 			2^63-1)
 
-	function Ind(nIn::Int64, nOut::Int64)
+	function Ind(nIn::Int64, nOut::Int64, prob_enable::AbstractFloat)
 		n = nIn + 1 + nOut
 		ind = Ind(
 			nIn,
 			nOut,
 			zeros(Float64, n, n),
 			[ActOrig() for _ in 1:n])
-		mutate_addconn!(ind)
+		indices = get_all_connectable_indices(ind.w, nIn, 0, collect(1:n))
+		for i in 1:length(indices)
+			if rand() < prob_enable
+				mutate_addconn!(ind)
+			end
+		end
 		return ind
 	end
 
@@ -89,12 +94,12 @@ module WANN
 			reward = -sum((result .- ans).^2)
 			append!(rewards, reward)
 			# println("input        : ", input)
-			println("result       : ", result)
-			println("ans          : ", ans)
-			println("result .- ans: ", result .- ans)
-			println("square       : ", (result .- ans).^2)
-			println("sum          : ", sum((result .- ans).^2))
-			println("reward       : ", reward)
+			# println("result       : ", result)
+			# println("ans          : ", ans)
+			# println("result .- ans: ", result .- ans)
+			# println("square       : ", (result .- ans).^2)
+			# println("sum          : ", sum((result .- ans).^2))
+			# println("reward       : ", reward)
 		end
 		return rewards
 	end
@@ -150,8 +155,8 @@ module WANN
 
 	Base.copy(pop::Pop) = Pop(copy(pop.inds))
 
-	function Pop(nIn::Integer, nOut::Integer, size::Integer)
-		return Pop([Ind(nIn, nOut) for i = 1:size])
+	function Pop(nIn::Integer, nOut::Integer, size::Integer, prob_enable::AbstractFloat)
+		return Pop([Ind(nIn, nOut, prob_enable) for i = 1:size])
 	end
 
 	function evolve_pop()

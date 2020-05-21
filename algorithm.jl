@@ -153,13 +153,13 @@ function get_random_index(f::Function, v::Array{<:AbstractFloat, 2})::CartesianI
 	return candidate[rand(1:length(candidate))]
 end
 
-function get_random_connectable_index(
+function get_all_connectable_indices(
 		v::Array{<:AbstractFloat, 2},
 		nIn::Int,
 		nHid::Int,
-		order::Vector{Int})::CartesianIndex{2}
+		order::Vector{Int})::Vector{CartesianIndex{2}}
 	indices = findall(x -> x == 0, v)
-	candidate = CartesianIndex{2}[]
+	ans = CartesianIndex{2}[]
 	for c in indices
 		y = order[c[1]]
 		x = order[c[2]]
@@ -179,11 +179,20 @@ function get_random_connectable_index(
 			continue
 		end
 		# println("pushed")
-		push!(candidate, CartesianIndex(y, x))
+		push!(ans, CartesianIndex(y, x))
 	end
-	if length(candidate) == 0
+	if length(ans) == 0
 		throw(error("no room"))
 	end
+	return ans
+end
+
+function get_random_connectable_index(
+		v::Array{<:AbstractFloat, 2},
+		nIn::Int,
+		nHid::Int,
+		order::Vector{Int})::CartesianIndex{2}
+	candidate = get_all_connectable_indices(v, nIn, nHid, order)
 	return candidate[rand(1:length(candidate))]
 end
 
