@@ -42,12 +42,7 @@ module WANN
 			nOut,
 			zeros(Float64, n, n),
 			[ActOrig() for _ in 1:n])
-		indices = get_all_connectable_indices(ind.w, nIn, 0, collect(1:n))
-		for i in 1:length(indices)
-			if rand() < prob_enable
-				mutate_addconn!(ind)
-			end
-		end
+		init_addconn!(ind.w, nIn + 1, prob_enable)
 		return ind
 	end
 
@@ -180,8 +175,8 @@ module WANN
 			end
 			sort!(pop.inds, lt = (a, b) -> a.reward_avg < b.reward_avg)
 			println("reward 1 ", pop.inds[end].reward_avg)
-			println("reward 2 ", pop.inds[end-1].reward_avg)
-			println("reward 3 ", pop.inds[end-2].reward_avg)
+			# println("reward 2 ", pop.inds[end-1].reward_avg)
+			# println("reward 3 ", pop.inds[end-2].reward_avg)
 			rank!(pop.inds)
 			n_pop = length(pop.inds)
 			parents = pop.inds

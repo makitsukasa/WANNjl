@@ -76,7 +76,7 @@ function topological_sort(order::Vector{Int}, adjacency_matrix::Array{Bool, 2}, 
 end
 
 function get_shuffued_order(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		nIn::Int, nOut::Int,
 		orig_order::Vector{Int})::Vector{Int}
 	hid = orig_order[nIn+1:end-nOut]
@@ -84,11 +84,11 @@ function get_shuffued_order(
 	return [orig_order[1:nIn]; hid; orig_order[end-nOut+1:end]]
 end
 
-get_shuffued_order(v::Array{<:AbstractFloat, 2}, nIn::Int, nOut::Int)::Vector{Int} =
+get_shuffued_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{Int} =
 	get_shuffued_order(v, nIn, nOut, collect(1:size(v,1)))
 
 function get_sorted_order(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		nIn::Int, nOut::Int,
 		orig_order::Vector{Int})::Vector{Int}
 	n = size(v, 1)
@@ -98,14 +98,14 @@ function get_sorted_order(
 	# return 1:size(v,1)
 end
 
-get_sorted_order(v::Array{<:AbstractFloat, 2}, nIn::Int, nOut::Int)::Vector{Int} =
+get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{Int} =
 	get_sorted_order(v, nIn, nOut, collect(1:size(v,1)))
 
 function get_assigned_v(
-		orig::Array{<:AbstractFloat, 2},
+		orig::Matrix{<:AbstractFloat},
 		order::Vector{Int},
 		special::Dict{CartesianIndex{2}, <:AbstractFloat} = Dict{CartesianIndex{2}, <:AbstractFloat}(),
-		default::AbstractFloat = 0.0)::Array{<:AbstractFloat, 2}
+		default::AbstractFloat = 0.0)::Matrix{<:AbstractFloat}
 	n = length(order)
 	ans = zeros((n, n))
 	for y = 1:n, x = 1:n
@@ -122,9 +122,9 @@ function get_assigned_v(
 	return ans
 end
 
-get_assigned_v(orig::Array{<:AbstractFloat, 2},
+get_assigned_v(orig::Matrix{<:AbstractFloat},
 		special::Dict{CartesianIndex{2}, <:AbstractFloat} = Dict{CartesianIndex{2}, <:AbstractFloat}(),
-		default::AbstractFloat = 0.0)::Array{<:AbstractFloat, 2} =
+		default::AbstractFloat = 0.0)::Matrix{<:AbstractFloat} =
 	get_assigned_v(orig, collect(1:size(orig, 1)), special, default)
 
 function get_assigned_a(
@@ -143,7 +143,7 @@ function get_assigned_a(
 	return ans
 end
 
-function get_random_index(f::Function, v::Array{<:AbstractFloat, 2})::CartesianIndex{2}
+function get_random_index(f::Function, v::Matrix{<:AbstractFloat})::CartesianIndex{2}
 	candidate = findall(f, v)
 	if length(candidate) == 0
 		println("no candidate found")
@@ -154,7 +154,7 @@ function get_random_index(f::Function, v::Array{<:AbstractFloat, 2})::CartesianI
 end
 
 function get_all_connectable_indices(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		nIn::Int,
 		nHid::Int,
 		order::Vector{Int})::Vector{CartesianIndex{2}}
@@ -188,7 +188,7 @@ function get_all_connectable_indices(
 end
 
 function get_random_connectable_index(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		nIn::Int,
 		nHid::Int,
 		order::Vector{Int})::CartesianIndex{2}
@@ -197,17 +197,26 @@ function get_random_connectable_index(
 end
 
 get_random_connectable_index(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		nIn::Int,
 		nHid::Int)::CartesianIndex{2} =
 	get_random_connectable_index(v, nIn, nHid, collect(1:size(v,1)))
 
+function init_addconn!(v::Matrix{<:AbstractFloat}, nIn, prob_enable)
+	candidate = get_all_connectable_indices(v, nIn, 0, collect(1:size(v, 1)))
+	for index in candidate
+		if rand() < prob_enable
+			v[index] = 1
+		end
+	end
+end
+
 function mutate_addconn(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		a::Vector{<:Act},
 		nIn::Int,
 		nHid::Int,
-		nOut::Int)::Tuple{Array{<:AbstractFloat, 2}, Vector{<:Act}}
+		nOut::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}}
 	# shuhhle
 	order = get_shuffued_order(v, nIn, nOut)
 	# println("shuffled: ", order)
@@ -222,9 +231,9 @@ function mutate_addconn(
 end
 
 function mutate_addnode(
-		v::Array{<:AbstractFloat, 2},
+		v::Matrix{<:AbstractFloat},
 		a::Vector{<:Act},
-		nIn::Int)::Tuple{Array{<:AbstractFloat, 2}, Vector{<:Act}}
+		nIn::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}}
 	# index
 	index = get_random_index(x -> x == 1, v)
 	src = index[1]
@@ -352,8 +361,8 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 	function main()
 		# for test
-		# get_random_index(f::Function, v::Array{<:AbstractFloat, 2})::CartesianIndex{2} =
-		# 	invoke((f, v) -> CartesianIndex(1, 2), Tuple{Function, Array{<:AbstractFloat, 2}}, f, v)
+		# get_random_index(f::Function, v::Matrix{<:AbstractFloat})::CartesianIndex{2} =
+		# 	invoke((f, v) -> CartesianIndex(1, 2), Tuple{Function, Matrix{<:AbstractFloat}}, f, v)
 
 		# v = [
 		# 	0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;

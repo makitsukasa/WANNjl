@@ -29,7 +29,8 @@ hyp = Dict(
 )
 
 pop = WANN.Pop(28^2, 10, n_pop, hyp["prob_initEnable"])
-WANN.train(pop, imgs, labels, 10, hyp)
+println("train")
+WANN.train(pop, imgs, labels, 100, hyp)
 
 # in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
 # ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;
