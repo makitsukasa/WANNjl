@@ -27,7 +27,7 @@ mutable struct ActOrig <: Act
 	id::UInt
 end
 
-ActOrig() = ActOrig(1)
+ActOrig() = ActOrig(rand(1:11))
 
 function get_function(act::ActOrig)
 	if act.id == 2      # Unsigned Step Function
@@ -56,7 +56,7 @@ function get_function(act::ActOrig)
 	end
 end
 
-function mutate(act::ActOrig)
+function mutate!(act::ActOrig)
 	act.id = rand(1:11)
 end
 

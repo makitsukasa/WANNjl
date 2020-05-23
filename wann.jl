@@ -83,11 +83,12 @@ module WANN
 			ans::Matrix{<:T},
 			shared_weights::Vector{<:T})::Vector{T} where T <: AbstractFloat
 		n_run = length(shared_weights)
-		rewards = T[]
-		for w in shared_weights
-			result = calc_output(ind, input, w)
-			reward = -sum((result .- ans).^2)
-			append!(rewards, reward)
+		n_sample = size(input, 1)
+		rewards = Vector{T}(undef, n_run)
+		for i in 1:n_run
+			result = calc_output(ind, input, shared_weights[i])
+			reward = -sum((result .- ans).^2) / n_sample
+			rewards[i] = reward
 			# println("input        : ", input)
 			# println("result       : ", result)
 			# println("ans          : ", ans)
@@ -104,7 +105,7 @@ module WANN
 
 	function mutate!(ind::Ind)
 		r = rand()
-		if r < 0.5
+		if r < 0.25
 			# println(i, "addconn")
 			# println(ind.w)
 			check_regal_matrix(ind)
@@ -112,18 +113,19 @@ module WANN
 				mutate_addconn!(ind)
 			catch
 				println("no room")
-				r = 1
+				# println_matrix(ind.w)
+				r = 1.0
 			end
 			# println_matrix(ind.w)
 			check_regal_matrix(ind)
-		elseif r < 0.6
+		elseif r < 0.25
 			# println(i, "addnode")
 			# println(ind.w)
 			check_regal_matrix(ind)
 			mutate_addnode!(ind)
 			# println_matrix(ind.w)
 			check_regal_matrix(ind)
-		elseif r < 0.8
+		elseif r < 1.0
 			mutate_act!(ind)
 			check_regal_matrix(ind)
 		end
@@ -230,17 +232,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
 	using CSV # read
 
 	function main()
-		dataframe = CSV.read("data/sphere2.csv", header=true, delim=",")
+		dataframe = CSV.read("data/sphere5.csv", header=true, delim=",")
 		hyp = Dict(
 			"select_cull_ratio" => 0.2,
 			"select_elite_ratio"=> 0.2,
 			"select_tourn_size" => 32,
+			"prob_initEnable" => 0.05,
 			"prob_crossover" => 0.0
 		)
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
-		pop = WANN.Pop(size(in, 2), size(ans, 2), 100)
-		WANN.train(pop, in, ans, 15, hyp)
+		pop = WANN.Pop(size(in, 2), size(ans, 2), 10, hyp["prob_initEnable"])
+		println("train")
+		WANN.train(pop, in, ans, 100, hyp)
 	end
 
 	main()

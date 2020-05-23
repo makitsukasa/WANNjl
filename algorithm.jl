@@ -209,6 +209,10 @@ function init_addconn!(v::Matrix{<:AbstractFloat}, nIn, prob_enable)
 			v[index] = 1
 		end
 	end
+	if length(findall(x -> x > 0, v)) == 0
+		index = get_random_connectable_index(v, nIn, 0, collect(1:size(v, 1)))
+		v[index] = 1
+	end
 end
 
 function mutate_addconn(
@@ -257,7 +261,7 @@ function mutate_addnode(
 end
 
 function mutate_act(a::Vector{<:Act})
-	a[rand(1:length(a))] |> mutate
+	mutate!(a[rand(1:length(a))])
 	return a
 end
 
