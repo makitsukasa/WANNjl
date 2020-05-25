@@ -131,12 +131,19 @@ module WANN
 		end
 	end
 
-	function rank!(inds::Vector{Ind})
+	function rank!(inds::Vector{Ind}, alg_probMoo)
 		# Compile objectives
 		reward_avg = [ind.reward_avg for ind in inds]
 		reward_max = [maximum(ind.rewards) for ind in inds]
 		nConns = [length(findall(!iszero, ind.w)) for ind in inds]
-		objectives = hcat(reward_avg, reward_max, 1 ./ nConns) # Maximize
+
+		# Alternate second objective
+		if  rand() > alg_probMoo
+			objectives = hcat(reward_avg, reward_max)
+		else
+			objectives = hcat(reward_avg, 1 ./ nConns) # Maximize
+		end
+
 		rank = non_dominated_sort(objectives)
 		for i in 1:length(rank)
 			inds[i].rank = rank[i]
@@ -179,22 +186,22 @@ module WANN
 			println("reward 1 ", pop.inds[end].reward_avg)
 			# println("reward 2 ", pop.inds[end-1].reward_avg)
 			# println("reward 3 ", pop.inds[end-2].reward_avg)
-			rank!(pop.inds)
+			rank!(pop.inds, hyp["alg_probMoo"])
 			n_pop = length(pop.inds)
 			parents = pop.inds
 			children = Vector{Ind}(undef, n_pop)
 
 			# Sort by rank
-			sort!(pop.inds, lt = (a, b) -> a.rank < b.rank)
-
-			# Cull  - eliminate worst individuals from breeding pool
-			parents = parents[1:end - floor(Int64, hyp["select_cull_ratio"] * n_pop)]
+			sort!(pop.inds, lt = (a, b) -> a.rank == b.rank ? (a.rewardAvg < b.rewardAvg) : (a.rank < b.rank))
 
 			# Elitism - keep best individuals unchanged
 			n_elites = floor(Int64, hyp["select_elite_ratio"] * n_pop)
 			for i in 1:n_elites
 				children[i] = pop.inds[i]
 			end
+
+			# Cull  - eliminate worst individuals from breeding pool
+			parents = parents[1:end - floor(Int64, hyp["select_cull_ratio"] * n_pop)]
 
 			# Get parent pairs via tournament selection
 			# -- As individuals are sorted by fitness, index comparison is
@@ -219,7 +226,6 @@ module WANN
 			end
 
 			pop.inds = children
-			continue
 		end
 	end
 end
@@ -238,11 +244,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
 			"select_elite_ratio"=> 0.2,
 			"select_tourn_size" => 32,
 			"prob_initEnable" => 0.05,
+			"alg_probMoo" => 0.8,
 			"prob_crossover" => 0.0
 		)
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
-		pop = WANN.Pop(size(in, 2), size(ans, 2), 10, hyp["prob_initEnable"])
+		pop = WANN.Pop(size(in, 2), size(ans, 2), 100, hyp["prob_initEnable"])
 		println("train")
 		WANN.train(pop, in, ans, 100, hyp)
 	end

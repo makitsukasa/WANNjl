@@ -345,7 +345,7 @@ end
 function non_dominated_sort(objectives::Matrix{T})::Vector{T} where T <: Number
 	# Non-dominated Sort
 	fronts = get_fronts(objectives)
-	# # Rank each front by crowding distance
+	# Rank each front by crowding distance
 	for f in 1:length(fronts)
 		x1 = objectives[fronts[f], 1]
 		x2 = objectives[fronts[f], 2]
