@@ -24,7 +24,8 @@ hyp = Dict(
 	"select_cull_ratio" => 0.2,
 	"select_elite_ratio"=> 0.2,
 	"select_tourn_size" => 32,
-    "prob_initEnable" => 0.05,
+	"prob_initEnable" => 0.05,
+	"alg_probMoo" => 0.8,
 	"prob_crossover" => 0.0
 )
 
