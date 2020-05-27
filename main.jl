@@ -6,6 +6,7 @@ using Images: imresize
 
 n_sample = 1000
 n_pop = 960
+n_generation = 100
 image_size = 16
 
 # convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
@@ -35,7 +36,7 @@ hyp = Dict(
 
 pop = WANN.Pop(image_size^2, 10, n_pop, hyp["prob_initEnable"])
 println("train")
-WANN.train(pop, imgs, labels, 100, hyp)
+WANN.train(pop, imgs, labels, n_generation, hyp)
 
 # in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
 # ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;

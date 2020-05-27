@@ -62,6 +62,12 @@ module WANN
 		ind.a = mutate_act(ind.a)
 	end
 
+	function make_onehot(a::Vector{<:Number})
+		index = findall(a .== maximum(a))
+		# println("onehot index :", index)
+		return [in(i, index) ? 1.0 : 0.0 for i in 1:length(a)]
+	end
+
 	function calc_output(ind::Ind, input::Matrix{<:AbstractFloat}, shared_weight::AbstractFloat)
 		buff = zeros((axes(input, 1), ind.nNode))
 		# println("axes(buff): ", axes(buff))
@@ -75,6 +81,25 @@ module WANN
 			buff[:, i] = call(ind.a[i], b) * shared_weight
 		end
 		return buff[:, end-ind.nOut+1:end]
+	end
+
+	function classify(ind::Ind,
+				input::Matrix{<:AbstractFloat},
+				shared_weights::Vector{<:AbstractFloat} = [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
+		ans = zeros(size(calc_output(ind, input, shared_weights[1])))
+		for w in shared_weights
+			o = calc_output(ind, input, w)
+			onehot = mapslices(make_onehot, o, dims = 1)
+			# println("before onehot :", o)
+			# println("onehot dim1 :", mapslices(make_onehot, o, dims = 1))
+			# println("onehot dim2 :", mapslices(make_onehot, o, dims = 2))
+			ans += onehot
+		end
+		# println("before classify :", ans)
+		# println("after  classify :", ret)
+		ans = mapslices(make_onehot, ans, dims = 2)
+		ret = mapslices(x -> x ./ length(findall(!iszero, x)), ans, dims = 2)
+		return ret
 	end
 
 	function calc_rewards(
@@ -173,6 +198,18 @@ module WANN
 		end
 	end
 
+	function test(pop::Pop, data, ans)
+		sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
+		ind = pop.inds[1]
+		o = classify(ind, data)
+		wrong = sum(abs.(o .- ans), dims = 2) / 2
+		# println("classify : ", o)
+		# println("ans      : ", ans)
+		# println("wrong    : ", abs.(o .- ans), " -> ", wrong)
+		percentage = sum(wrong) / length(wrong)
+		println("accuracy rate : ", 1 - percentage)
+	end
+
 	function train(pop::Pop, data, ans, loop, hyp)
 		for i = 1:loop
 			println("gen ", i)
@@ -182,17 +219,21 @@ module WANN
 				pop.inds[i].reward_avg = mean(rewards)
 				pop.inds[i].rewards = deepcopy(rewards)
 			end
-			sort!(pop.inds, lt = (a, b) -> a.reward_avg < b.reward_avg)
-			println("reward 1 ", pop.inds[end].reward_avg)
-			# println("reward 2 ", pop.inds[end-1].reward_avg)
-			# println("reward 3 ", pop.inds[end-2].reward_avg)
+			sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
+			println("reward 1 ", pop.inds[1].reward_avg)
+			# println("reward 2 ", pop.inds[2].reward_avg)
+			# println("reward 3 ", pop.inds[3].reward_avg)
 			rank!(pop.inds, hyp["alg_probMoo"])
 			n_pop = length(pop.inds)
 			parents = pop.inds
 			children = Vector{Ind}(undef, n_pop)
 
+			if i in [1, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+				test(pop, data, ans)
+			end
+
 			# Sort by rank
-			sort!(pop.inds, lt = (a, b) -> a.rank == b.rank ? (a.rewardAvg < b.rewardAvg) : (a.rank < b.rank))
+			sort!(pop.inds, lt = (a, b) -> a.rank == b.rank ? (a.rewardAvg > b.rewardAvg) : (a.rank < b.rank))
 
 			# Elitism - keep best individuals unchanged
 			n_elites = floor(Int64, hyp["select_elite_ratio"] * n_pop)
@@ -227,6 +268,7 @@ module WANN
 
 			pop.inds = children
 		end
+		test(pop, data, ans)
 	end
 end
 
@@ -249,9 +291,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
 		)
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
-		pop = WANN.Pop(size(in, 2), size(ans, 2), 100, hyp["prob_initEnable"])
+		pop = WANN.Pop(size(in, 2), size(ans, 2), 10, hyp["prob_initEnable"])
 		println("train")
-		WANN.train(pop, in, ans, 100, hyp)
+		WANN.train(pop, in, ans, 1, hyp)
 	end
 
 	main()
