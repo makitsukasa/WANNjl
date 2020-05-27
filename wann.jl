@@ -206,7 +206,7 @@ module WANN
 		# println("classify : ", o)
 		# println("ans      : ", ans)
 		# println("wrong    : ", abs.(o .- ans), " -> ", wrong)
-		println("wrong    : ", wrong)
+		# println("wrong    : ", wrong)
 		println("accuracy rate : ", 1 - sum(wrong) / length(wrong))
 	end
 
@@ -229,6 +229,9 @@ module WANN
 			children = Vector{Ind}(undef, n_pop)
 
 			if i in [1, 10, 20, 30, 40, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+				println("test for train data")
+				test(pop, data, ans)
+				println("test for test  data")
 				test(pop, test_data, test_ans)
 			end
 
@@ -268,6 +271,9 @@ module WANN
 
 			pop.inds = children
 		end
+		println("test for train data")
+		test(pop, data, ans)
+		println("test for test  data")
 		test(pop, test_data, test_ans)
 	end
 end
