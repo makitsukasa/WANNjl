@@ -206,11 +206,11 @@ module WANN
 		# println("classify : ", o)
 		# println("ans      : ", ans)
 		# println("wrong    : ", abs.(o .- ans), " -> ", wrong)
-		percentage = sum(wrong) / length(wrong)
-		println("accuracy rate : ", 1 - percentage)
+		println("wrong    : ", wrong)
+		println("accuracy rate : ", 1 - sum(wrong) / length(wrong))
 	end
 
-	function train(pop::Pop, data, ans, loop, hyp)
+	function train(pop::Pop, data, ans, test_data, test_ans, loop, hyp)
 		for i = 1:loop
 			println("gen ", i)
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
@@ -228,12 +228,12 @@ module WANN
 			parents = pop.inds
 			children = Vector{Ind}(undef, n_pop)
 
-			if i in [1, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
-				test(pop, data, ans)
+			if i in [1, 10, 20, 30, 40, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+				test(pop, test_data, test_ans)
 			end
 
 			# Sort by rank
-			sort!(pop.inds, lt = (a, b) -> a.rank == b.rank ? (a.rewardAvg > b.rewardAvg) : (a.rank < b.rank))
+			sort!(pop.inds, lt = (a, b) -> a.rank < b.rank)
 
 			# Elitism - keep best individuals unchanged
 			n_elites = floor(Int64, hyp["select_elite_ratio"] * n_pop)
@@ -268,7 +268,7 @@ module WANN
 
 			pop.inds = children
 		end
-		test(pop, data, ans)
+		test(pop, test_data, test_ans)
 	end
 end
 
@@ -293,7 +293,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 		ans = convert(Matrix, select(dataframe, r"o"))
 		pop = WANN.Pop(size(in, 2), size(ans, 2), 10, hyp["prob_initEnable"])
 		println("train")
-		WANN.train(pop, in, ans, 1, hyp)
+		WANN.train(pop, in, ans, in, ans, 1, hyp)
 	end
 
 	main()
