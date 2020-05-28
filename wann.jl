@@ -143,7 +143,7 @@ module WANN
 			end
 			# println_matrix(ind.w)
 			check_regal_matrix(ind)
-		elseif r < 0.25
+		elseif r < 0.5
 			# println(i, "addnode")
 			# println(ind.w)
 			check_regal_matrix(ind)
@@ -223,17 +223,19 @@ module WANN
 			println("reward 1 ", pop.inds[1].reward_avg)
 			# println("reward 2 ", pop.inds[2].reward_avg)
 			# println("reward 3 ", pop.inds[3].reward_avg)
+
+			# if i in vcat([collect(1:50), collect(100:100:10000)]...)
+			if true
+				print("test for train data, ")
+				test(pop, data, ans)
+				print("test for test  data, ")
+				test(pop, test_data, test_ans)
+			end
+
 			rank!(pop.inds, hyp["alg_probMoo"])
 			n_pop = length(pop.inds)
 			parents = pop.inds
 			children = Vector{Ind}(undef, n_pop)
-
-			if i in [1, 10, 20, 30, 40, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
-				println("test for train data")
-				test(pop, data, ans)
-				println("test for test  data")
-				test(pop, test_data, test_ans)
-			end
 
 			# Sort by rank
 			sort!(pop.inds, lt = (a, b) -> a.rank < b.rank)
