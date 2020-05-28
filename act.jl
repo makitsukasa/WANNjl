@@ -63,9 +63,12 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
 	function main()
-		hoge = call(ActOrig(2), [2.0])
-		hoge = call([ActOrig(i) for i in 1:11], [1.0 for i in 1:11])
-		println(hoge)
+		for actid in 1:11
+			for val in -1.0:0.1:1.01
+				println(call(ActOrig(actid), val))
+			end
+			println()
+		end
 	end
 
 	main()

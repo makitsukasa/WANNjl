@@ -89,11 +89,11 @@ module WANN
 		ans = zeros(size(calc_output(ind, input, shared_weights[1])))
 		for w in shared_weights
 			o = calc_output(ind, input, w)
-			onehot = mapslices(make_onehot, o, dims = 1)
-			# println("before onehot :", o)
-			# println("onehot dim1 :", mapslices(make_onehot, o, dims = 1))
-			# println("onehot dim2 :", mapslices(make_onehot, o, dims = 2))
-			ans += onehot
+			softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), o, dims = 1)
+			# println("before softmax :", o)
+			# println("softmax dim1 :", mapslices(make_onehot, o, dims = 1))
+			# println("softmax dim2 :", mapslices(make_onehot, o, dims = 2))
+			ans += softmax
 		end
 		# println("before classify :", ans)
 		# println("after  classify :", ret)
@@ -112,6 +112,7 @@ module WANN
 		rewards = Vector{T}(undef, n_run)
 		for i in 1:n_run
 			result = calc_output(ind, input, shared_weights[i])
+			result = mapslices(x -> exp.(x) ./ sum(exp.(x)), result, dims = 1)
 			reward = -sum((result .- ans).^2) / n_sample
 			rewards[i] = reward
 			# println("input        : ", input)
@@ -301,7 +302,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 		ans = convert(Matrix, select(dataframe, r"o"))
 		pop = WANN.Pop(size(in, 2), size(ans, 2), 10, hyp["prob_initEnable"])
 		println("train")
-		WANN.train(pop, in, ans, in, ans, 1, hyp)
+		WANN.train(pop, in, ans, in, ans, 100, hyp)
 	end
 
 	main()
