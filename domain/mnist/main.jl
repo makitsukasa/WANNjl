@@ -1,5 +1,4 @@
 include("../../src/wann.jl")
-include("../../src/algorithm.jl")
 using LinearAlgebra: transpose!
 using Flux: onehot
 using Flux.Data.MNIST
@@ -13,6 +12,7 @@ image_size = 16
 
 function reward(output, labels)
 	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 1)
+	# println(typeof(-sum((softmax .- labels).^2) / n_sample))
 	return -sum((softmax .- labels).^2) / n_sample
 end
 
@@ -49,13 +49,6 @@ transpose!(test_imgs, hcat(vec.(test_imgs_f)[1:n_test_sample, :]...))
 hoge = map(x -> onehot(x, 0:9), MNIST.labels(:test)[1:n_test_sample, :])
 test_labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_test_sample] for x = 1:10]...)
 
-# println("typeof(imgs): ", typeof(imgs))
-# println("axes(imgs): ", axes(imgs))
-# println("typeof(labels): ", typeof(labels))
-# println("axes(labels): ", axes(labels))
-# println("labels: ", labels)
-# println("")
-
 hyp = Dict(
 	"select_cull_ratio" => 0.2,
 	"select_elite_ratio"=> 0.2,
@@ -79,9 +72,3 @@ param_for_train = Dict(
 
 println("train")
 WANN.train(param_for_train)
-
-# in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
-# ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;
-#        0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;]
-# pop = WANN.Pop(2, 4, 4)
-# WANN.train(pop, in, ans, 10)
