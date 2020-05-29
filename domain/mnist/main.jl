@@ -1,14 +1,37 @@
-include("./wann.jl")
+include("../../src/wann.jl")
+include("../../src/algorithm.jl")
 using LinearAlgebra: transpose!
 using Flux: onehot
 using Flux.Data.MNIST
 using Images: imresize
 
-n_sample = 100
-n_sample_test = 100
-n_pop = 100
+n_sample = 1000
+n_test_sample = 100
+n_pop = 960
 n_generation = 4096
 image_size = 16
+
+function reward(output, labels)
+	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 1)
+	return -sum((softmax .- labels).^2) / n_sample
+end
+
+function test(outputs, labels)
+	correct = 0
+	incorrect = 0
+	for o in outputs
+		for col in 1:size(o, 1)
+			output_label = argmax(o[col, 1:end])
+			ans_label = argmax(labels[col, 1:end])
+			if output_label == ans_label
+				correct += 1
+			else
+				incorrect += 1
+			end
+		end
+	end
+	println("acculacy late : ", correct / (correct + incorrect))
+end
 
 # convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
 imgs = zeros(Float64, (n_sample, image_size^2))
@@ -19,14 +42,12 @@ transpose!(imgs, hcat(vec.(imgs_f)[1:n_sample, :]...))
 hoge = map(x -> onehot(x, 0:9), MNIST.labels(:train)[1:n_sample, :])
 labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_sample] for x = 1:10]...)
 
-# convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
-imgs_test = zeros(Float64, (n_sample_test, image_size^2))
-# imgs_test_f = convert(Vector{Matrix{Float64}}, MNIST.images(:test))
-imgs_test_f = convert(Vector{Matrix{Float64}}, map(i -> imresize(i, (image_size, image_size)), MNIST.images(:test)))
-transpose!(imgs_test, hcat(vec.(imgs_test_f)[1:n_sample_test, :]...))
-# convert Array{Int64,1} into Array{Flux.OneHotVector,2}
-hoge = map(x -> onehot(x, 0:9), MNIST.labels(:test)[1:n_sample_test, :])
-labels_test = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_sample_test] for x = 1:10]...)
+# same for test
+test_imgs = zeros(Float64, (n_test_sample, image_size^2))
+test_imgs_f = convert(Vector{Matrix{Float64}}, map(i -> imresize(i, (image_size, image_size)), MNIST.images(:test)))
+transpose!(test_imgs, hcat(vec.(test_imgs_f)[1:n_test_sample, :]...))
+hoge = map(x -> onehot(x, 0:9), MNIST.labels(:test)[1:n_test_sample, :])
+test_labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_test_sample] for x = 1:10]...)
 
 # println("typeof(imgs): ", typeof(imgs))
 # println("axes(imgs): ", axes(imgs))
@@ -44,9 +65,20 @@ hyp = Dict(
 	"prob_crossover" => 0.0
 )
 
-pop = WANN.Pop(image_size^2, 10, n_pop, hyp["prob_initEnable"])
+param_for_train = Dict(
+	"pop" => WANN.Pop(image_size^2, 10, n_pop, hyp["prob_initEnable"]),
+	"data" => imgs,
+	"ans" => labels,
+	"test_data" => test_imgs,
+	"test_ans" => test_labels,
+	"n_generation" => n_generation,
+	"reward" => reward,
+	"test" => test,
+	"hyp" => hyp,
+)
+
 println("train")
-WANN.train(pop, imgs, labels, imgs_test, labels_test, n_generation, hyp)
+WANN.train(param_for_train)
 
 # in = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0; 0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0;]
 # ans = [0.0 0.0 0.0 1.0; 0.0 1.0 1.0 1.0; 0.0 1.0 1.0 0.0; 1.0 0.0 0.0 1.0;

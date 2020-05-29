@@ -83,27 +83,28 @@ module WANN
 		return buff[:, end-ind.nOut+1:end]
 	end
 
-	function classify(ind::Ind,
-				input::Matrix{<:AbstractFloat},
-				shared_weights::Vector{<:AbstractFloat} = [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
-		ans = zeros(size(calc_output(ind, input, shared_weights[1])))
-		for w in shared_weights
-			o = calc_output(ind, input, w)
-			softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), o, dims = 1)
-			# println("before softmax :", o)
-			# println("softmax dim1 :", mapslices(make_onehot, o, dims = 1))
-			# println("softmax dim2 :", mapslices(make_onehot, o, dims = 2))
-			ans += softmax
-		end
-		# println("before classify :", ans)
-		# println("after  classify :", ret)
-		ans = mapslices(make_onehot, ans, dims = 2)
-		ret = mapslices(x -> x ./ length(findall(!iszero, x)), ans, dims = 2)
-		return ret
-	end
+	# function classify(ind::Ind,
+	# 			input::Matrix{<:AbstractFloat},
+	# 			shared_weights::Vector{<:AbstractFloat} = [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
+	# 	ans = zeros(size(calc_output(ind, input, shared_weights[1])))
+	# 	for w in shared_weights
+	# 		o = calc_output(ind, input, w)
+	# 		softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), o, dims = 1)
+	# 		# println("before softmax :", o)
+	# 		# println("softmax dim1 :", mapslices(make_onehot, o, dims = 1))
+	# 		# println("softmax dim2 :", mapslices(make_onehot, o, dims = 2))
+	# 		ans += softmax
+	# 	end
+	# 	# println("before classify :", ans)
+	# 	# println("after  classify :", ret)
+	# 	# ans = mapslices(make_onehot, ans, dims = 2)
+	# 	# ret = mapslices(x -> x ./ length(findall(!iszero, x)), ans, dims = 2)
+	# 	return ans
+	# end
 
 	function calc_rewards(
 			ind::Ind,
+			reward::Function,
 			input::Matrix{<:T},
 			ans::Matrix{<:T},
 			shared_weights::Vector{<:T})::Vector{T} where T <: AbstractFloat
@@ -112,9 +113,7 @@ module WANN
 		rewards = Vector{T}(undef, n_run)
 		for i in 1:n_run
 			result = calc_output(ind, input, shared_weights[i])
-			# result = mapslices(x -> exp.(x) ./ sum(exp.(x)), result, dims = 1)
-			reward = -sum((result .- ans).^2) / n_sample
-			rewards[i] = reward
+			rewards[i] = reward(result, ans)
 			# println("input        : ", input)
 			# println("result       : ", result)
 			# println("ans          : ", ans)
@@ -126,8 +125,8 @@ module WANN
 		return rewards
 	end
 
-	calc_rewards(ind::Ind, input::Matrix{<:AbstractFloat}, ans::Matrix{<:AbstractFloat}) =
-		calc_rewards(ind, input, ans, [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
+	calc_rewards(ind::Ind, reward::Function, input::Matrix{<:AbstractFloat}, ans::Matrix{<:AbstractFloat}) =
+		calc_rewards(ind, reward, input, ans, [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
 
 	function mutate!(ind::Ind)
 		r = rand()
@@ -199,24 +198,33 @@ module WANN
 		end
 	end
 
-	function test(pop::Pop, data, ans)
-		sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
-		ind = pop.inds[1]
-		o = classify(ind, data)
-		wrong = sum(abs.(o .- ans), dims = 2) / 2
-		# println("classify : ", o)
-		# println("ans      : ", ans)
-		# println("wrong    : ", abs.(o .- ans), " -> ", wrong)
-		# println("wrong    : ", wrong)
-		println("accuracy rate : ", 1 - sum(wrong) / length(wrong))
+	function test(pop::Pop, test_func, data, ans)
+		# sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
+		# ind = pop.inds[1]
+		outputs = []
+		for ind in pop.inds
+			for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+				o = calc_output(ind, data, w)
+				push!(outputs, o)
+			end
+		end
+		test_func(outputs, ans)
 	end
 
-	function train(pop::Pop, data, ans, test_data, test_ans, loop, hyp)
-		for i = 1:loop
+	function train(param)
+		pop = param["pop"]
+		data = param["data"]
+		ans = param["ans"]
+		test_data = param["test_data"]
+		test_ans = param["test_ans"]
+		hyp = param["hyp"]
+		reward = param["reward"]
+		test_func = param["test"]
+		for i = 1:param["n_generation"]
 			println("gen ", i)
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
 			for i in 1:length(pop.inds)
-				rewards = calc_rewards(pop.inds[i], data, ans)
+				rewards = calc_rewards(pop.inds[i], reward, data, ans)
 				pop.inds[i].reward_avg = mean(rewards)
 				pop.inds[i].rewards = deepcopy(rewards)
 			end
@@ -226,12 +234,12 @@ module WANN
 			# println("reward 3 ", pop.inds[3].reward_avg)
 
 			# if i in vcat([collect(1:50), collect(100:100:10000)]...)
-			# if true
-			# 	print("test for train data, ")
-			# 	test(pop, data, ans)
-			# 	print("test for test  data, ")
-			# 	test(pop, test_data, test_ans)
-			# end
+			if true
+				print("test for train data, ")
+				test(pop, test_func, data, ans)
+				print("test for test  data, ")
+				test(pop, test_func, test_data, test_ans)
+			end
 
 			rank!(pop.inds, hyp["alg_probMoo"])
 			n_pop = length(pop.inds)
@@ -274,10 +282,10 @@ module WANN
 
 			pop.inds = children
 		end
-		# println("test for train data")
-		# test(pop, data, ans)
-		# println("test for test  data")
-		# test(pop, test_data, test_ans)
+		print("test for train data, ")
+		test(pop, test_func, data, ans)
+		print("test for test  data, ")
+		test(pop, test_func, test_data, test_ans)
 	end
 end
 
