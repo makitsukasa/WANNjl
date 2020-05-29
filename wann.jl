@@ -112,7 +112,7 @@ module WANN
 		rewards = Vector{T}(undef, n_run)
 		for i in 1:n_run
 			result = calc_output(ind, input, shared_weights[i])
-			result = mapslices(x -> exp.(x) ./ sum(exp.(x)), result, dims = 1)
+			# result = mapslices(x -> exp.(x) ./ sum(exp.(x)), result, dims = 1)
 			reward = -sum((result .- ans).^2) / n_sample
 			rewards[i] = reward
 			# println("input        : ", input)
@@ -226,12 +226,12 @@ module WANN
 			# println("reward 3 ", pop.inds[3].reward_avg)
 
 			# if i in vcat([collect(1:50), collect(100:100:10000)]...)
-			if true
-				print("test for train data, ")
-				test(pop, data, ans)
-				print("test for test  data, ")
-				test(pop, test_data, test_ans)
-			end
+			# if true
+			# 	print("test for train data, ")
+			# 	test(pop, data, ans)
+			# 	print("test for test  data, ")
+			# 	test(pop, test_data, test_ans)
+			# end
 
 			rank!(pop.inds, hyp["alg_probMoo"])
 			n_pop = length(pop.inds)
@@ -274,10 +274,10 @@ module WANN
 
 			pop.inds = children
 		end
-		println("test for train data")
-		test(pop, data, ans)
-		println("test for test  data")
-		test(pop, test_data, test_ans)
+		# println("test for train data")
+		# test(pop, data, ans)
+		# println("test for test  data")
+		# test(pop, test_data, test_ans)
 	end
 end
 
@@ -300,9 +300,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
 		)
 		in = convert(Matrix, select(dataframe, r"i"))
 		ans = convert(Matrix, select(dataframe, r"o"))
-		pop = WANN.Pop(size(in, 2), size(ans, 2), 10, hyp["prob_initEnable"])
+		n_test = div(size(dataframe)[2], 5)
+		in_test = in[end-n_test:end]
+		ans_test = ans[end-n_test:end]
+		in = in[1:end-n_test]
+		ans = ans[1:end-n_test]
+		pop = WANN.Pop(size(in, 2), size(ans, 2), 500, hyp["prob_initEnable"])
 		println("train")
-		WANN.train(pop, in, ans, in, ans, 100, hyp)
+		WANN.train(pop, in, ans, in_test, ans_test, 1000, hyp)
 	end
 
 	main()

@@ -4,10 +4,10 @@ using Flux: onehot
 using Flux.Data.MNIST
 using Images: imresize
 
-n_sample = 1000
+n_sample = 100
 n_sample_test = 100
-n_pop = 960
-n_generation = 100
+n_pop = 100
+n_generation = 4096
 image_size = 16
 
 # convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
