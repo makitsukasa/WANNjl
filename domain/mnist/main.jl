@@ -3,6 +3,7 @@ using LinearAlgebra: transpose!
 using Flux: onehot
 using Flux.Data.MNIST
 using Images: imresize
+using Statistics: mean
 
 n_sample = 1000
 n_test_sample = 100
@@ -11,9 +12,9 @@ n_generation = 4096
 image_size = 16
 
 function reward(output, labels)
-	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 1)
-	# println(typeof(-sum((softmax .- labels).^2) / n_sample))
-	return -sum((softmax .- labels).^2) / n_sample
+	# softmax cross entropy
+	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 2)
+	return -sum(labels .* log.(softmax)) / n_sample
 end
 
 function test(outputs, labels)

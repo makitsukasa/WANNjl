@@ -3,19 +3,18 @@ using DataFrames # select
 using CSV # read
 using Statistics: mean
 
-n_pop = 100
+n_pop = 1000
 n_generation = 1000
 
 function reward(output, ans)
-	n_sample = size(ans, 1)
-	return -sum((output .- ans).^2) / n_sample
+	return -mean(abs.(ans .- output) ./ ans)
 end
 
 function test(outputs, ans)
 	n_test = size(ans, 1)
 	diffs = []
 	for o in outputs
-		push!(diffs, sum(abs.(o .- ans) ./ ans) / n_test)
+		push!(diffs, mean(abs.(ans .- o) ./ ans))
 	end
 	println("avg diff : ", mean(diffs))
 end
