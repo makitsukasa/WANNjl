@@ -4,6 +4,7 @@ using CSV # read
 using Statistics: mean
 
 n_pop = 1000
+n_sample = 2^63 - 1
 n_generation = 10000
 
 function reward(output, ans)
@@ -15,18 +16,18 @@ function test(outputs, ans)
 	for o in outputs
 		push!(diffs, mean(abs.(ans .- o) ./ ans))
 	end
-	println("avg diff : ", mean(diffs))
+	println("avg diff : $(mean(diffs)), min diff : $(minimum(diffs))")
 end
 
 dataframe = CSV.read("domain/sphere/data/sphere5.csv", header=true, delim=",")
-n_sample = size(dataframe)[1]
+n_sample = min(n_sample, div(size(dataframe)[1], 5) * 4)
 n_test = div(n_sample, 5)
 in = convert(Matrix, select(dataframe, r"i"))
 ans = convert(Matrix, select(dataframe, r"o"))
-test_in = in[(end - n_test + 1):end, :]
-test_ans = ans[(end - n_test + 1):end, :]
-in = in[1:(end - n_test), :]
-ans = ans[1:(end - n_test), :]
+test_in = in[(n_sample - n_test + 1):n_sample, :]
+test_ans = ans[(n_sample - n_test + 1):n_sample, :]
+in = in[1:(n_sample - n_test), :]
+ans = ans[1:(n_sample - n_test), :]
 
 hyp = Dict(
 	"select_cull_ratio" => 0.,

@@ -27,7 +27,7 @@ module WANN
 	end
 
 	Base.hash(i::Ind, h::UInt) = hash(i.a, hash(i.w, hash(:Ind, h)))
-	Base.isequal(a::Ind, b::Ind) = Base.isequal(hash(a), hash(b))
+	Base.:(==)(a::Ind, b::Ind) = Base.isequal(hash(a), hash(b))
 
 	Ind(nIn::Int64, nOut::Int64, w::Matrix{Float64}, a::Vector{<:Act}) =
 		Ind(nIn,
@@ -62,7 +62,8 @@ module WANN
 	end
 
 	function mutate_act!(ind::Ind)
-		ind.a = mutate_act(ind.a)
+		connected_indices = findall(!iszero, reshape(sum(ind.w, dims = 2), length(ind.a)))
+		ind.a = mutate_act(ind.a, connected_indices)
 	end
 
 	function make_onehot(a::Vector{<:Number})
@@ -155,6 +156,7 @@ module WANN
 	end
 
 	function rank!(inds::Vector{Ind}, alg_probMoo)
+		shuffle!(inds)
 		# Alternate second objective
 		if  rand() > alg_probMoo
 			# Compile objectives
@@ -234,9 +236,16 @@ module WANN
 				end
 			end
 			sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
-			println("reward 1 ", pop.inds[1].reward_avg)
-			# println("reward 2 ", pop.inds[2].reward_avg)
-			# println("reward 3 ", pop.inds[3].reward_avg)
+			println("reward $(pop.inds[1].reward_avg), $(pop.inds[2].reward_avg), $(pop.inds[3].reward_avg)")
+			# println_matrix(pop.inds[1].w)
+			# println([a.id for a in pop.inds[1].a])
+			# println()
+			# println_matrix(pop.inds[2].w)
+			# println([a.id for a in pop.inds[2].a])
+			# println()
+			# println_matrix(pop.inds[3].w)
+			# println([a.id for a in pop.inds[3].a])
+			# println()
 
 			# if i in vcat([collect(1:50), collect(100:100:10000)]...)
 			if true
@@ -293,6 +302,24 @@ module WANN
 			end
 
 			pop.inds = children
+
+			# cnt = 0
+			# for a in 2:length(pop.inds)
+			# 	for b in 1:a-1
+			# 		if pop.inds[a] == pop.inds[b]
+			# 			cnt += 1
+			# 			println_matrix(pop.inds[a].w)
+			# 			println_matrix(pop.inds[b].w)
+			# 			println()
+			# 		end
+			# 	end
+			# end
+			# if cnt > 0
+			# 	println("$cnt same inds")
+			# 	if cnt >= length(pop.inds)
+			# 		exit()
+			# 	end
+			# end
 		end
 		println()
 		print("test for train data, ")
@@ -306,6 +333,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 	using DataFrames # select
 	using CSV # read
 	using Statistics: mean
+	include("./algorithm.jl")
 
 	function main()
 		n_pop = 100
@@ -322,7 +350,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 			for o in outputs
 				push!(diffs, mean(abs.(ans .- o) ./ ans))
 			end
-			println("avg diff : ", mean(diffs))
+			println("avg diff : $(mean(diffs)), min diff : $(minimum(diffs))")
 		end
 
 		dataframe = CSV.read("domain/sphere/data/sphere5.csv", header=true, delim=",")
