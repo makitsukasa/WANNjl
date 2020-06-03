@@ -7,7 +7,7 @@ using Statistics: mean
 
 n_sample = 1000
 n_test_sample = 100
-n_pop = 960
+n_pop = 9600
 n_generation = 4096
 image_size = 16
 

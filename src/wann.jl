@@ -1,6 +1,6 @@
 module WANN
 	using LinearAlgebra: dot
-	using Statistics: mean
+	using Statistics: mean, normalize
 	using Flux
 	include("./algorithm.jl")
 	export Ind, WANN
@@ -25,6 +25,9 @@ module WANN
 			return getfield(ind, sym)
 		end
 	end
+
+	Base.hash(i::Ind, h::UInt) = hash(i.a, hash(i.w, hash(:Ind, h)))
+	Base.isequal(a::Ind, b::Ind) = Base.isequal(hash(a), hash(b))
 
 	Ind(nIn::Int64, nOut::Int64, w::Matrix{Float64}, a::Vector{<:Act}) =
 		Ind(nIn,
@@ -75,32 +78,23 @@ module WANN
 		# println("axes(buff[2:ind.nIn+1, :]): ", axes(buff[:, 2:ind.nIn+1]))
 		buff[:, 1] .= 1 # bias
 		buff[:, 2:ind.nIn+1] = input
-		for i in ind.nIn+2:ind.nNode
+		for i in (ind.nIn + 2):ind.nNode
 			b = buff * ind.w[:, i]
 			# println(size(buff), size(ind.w[:, i]), size(b))
-			buff[:, i] = call(ind.a[i], b) * shared_weight
+			buff[:, i] = call(ind.a[i], b) .* shared_weight
+			# println_matrix(buff)
+			# println()
+			# println_matrix(ind.w)
+			# println()
+			# println_matrix(ind.w[:, i])
+			# println()
+			# println_matrix(b)
+			# println()
+			# println_matrix(buff[:, i])
+			# exit()
 		end
-		return buff[:, end-ind.nOut+1:end]
+		return buff[:, (end - ind.nOut + 1):end]
 	end
-
-	# function classify(ind::Ind,
-	# 			input::Matrix{<:AbstractFloat},
-	# 			shared_weights::Vector{<:AbstractFloat} = [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
-	# 	ans = zeros(size(calc_output(ind, input, shared_weights[1])))
-	# 	for w in shared_weights
-	# 		o = calc_output(ind, input, w)
-	# 		softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), o, dims = 1)
-	# 		# println("before softmax :", o)
-	# 		# println("softmax dim1 :", mapslices(make_onehot, o, dims = 1))
-	# 		# println("softmax dim2 :", mapslices(make_onehot, o, dims = 2))
-	# 		ans += softmax
-	# 	end
-	# 	# println("before classify :", ans)
-	# 	# println("after  classify :", ret)
-	# 	# ans = mapslices(make_onehot, ans, dims = 2)
-	# 	# ret = mapslices(x -> x ./ length(findall(!iszero, x)), ans, dims = 2)
-	# 	return ans
-	# end
 
 	function calc_rewards(
 			ind::Ind,
@@ -114,13 +108,17 @@ module WANN
 		for i in 1:n_run
 			result = calc_output(ind, input, shared_weights[i])
 			rewards[i] = reward(result, ans)
-			# println("input        : ", input)
-			# println("result       : ", result)
-			# println("ans          : ", ans)
-			# println("result .- ans: ", result .- ans)
-			# println("square       : ", (result .- ans).^2)
-			# println("sum          : ", sum((result .- ans).^2))
-			# println("reward       : ", reward)
+			# if rewards[i] == -1.0
+			# 	# println("input        : ", input)
+			# 	println("result       : ", result)
+			# 	println("ans          : ", ans)
+			# 	println("result .- ans: ", result .- ans)
+			# 	println("abs          : ", abs.(result .- ans))
+			# 	println("norm(abs)    : ", abs.(result .- ans) ./ ans)
+			# 	println("mean(abs)    : ", mean(abs.(result .- ans) ./ ans))
+			# 	println("reward       : ", rewards[i])
+			# 	exit()
+			# end
 		end
 		return rewards
 	end
@@ -157,16 +155,17 @@ module WANN
 	end
 
 	function rank!(inds::Vector{Ind}, alg_probMoo)
-		# Compile objectives
-		reward_avg = [ind.reward_avg for ind in inds]
-		reward_max = [maximum(ind.rewards) for ind in inds]
-		nConns = [length(findall(!iszero, ind.w)) for ind in inds]
-
 		# Alternate second objective
 		if  rand() > alg_probMoo
-			objectives = hcat(reward_avg, reward_max)
+			# Compile objectives
+			reward_avg = [ind.reward_avg for ind in inds]
+			reward_max = [maximum(ind.rewards) for ind in inds]
+			objectives = hcat(normalize(reward_avg), normalize(reward_max))
 		else
-			objectives = hcat(reward_avg, 1 ./ nConns) # Maximize
+			# Compile objectives
+			reward_avg = [ind.reward_avg for ind in inds]
+			nConns = [length(findall(!iszero, ind.w)) for ind in inds]
+			objectives = hcat(normalize(reward_avg), normalize(1 ./ nConns)) # Maximize
 		end
 
 		rank = non_dominated_sort(objectives)
@@ -186,16 +185,6 @@ module WANN
 
 	function Pop(nIn::Integer, nOut::Integer, size::Integer, prob_enable::AbstractFloat)
 		return Pop([Ind(nIn, nOut, prob_enable) for i = 1:size])
-	end
-
-	function evolve_pop()
-
-	end
-
-	function mutate!(inds::Vector{<:Ind})
-		for i in 1:length(inds)
-			mutate!(i)
-		end
 	end
 
 	function test(pop::Pop, test_func, data, ans)
@@ -227,6 +216,10 @@ module WANN
 				rewards = calc_rewards(pop.inds[i], reward, data, ans)
 				pop.inds[i].reward_avg = mean(rewards)
 				pop.inds[i].rewards = deepcopy(rewards)
+				if isnan(sum(rewards)) || isinf(sum(rewards))
+					println("reward is invalid $rewards")
+					exit()
+				end
 			end
 			sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
 			println("reward 1 ", pop.inds[1].reward_avg)
@@ -243,7 +236,7 @@ module WANN
 
 			rank!(pop.inds, hyp["alg_probMoo"])
 			n_pop = length(pop.inds)
-			parents = pop.inds
+			parents = deepcopy(pop.inds)
 			children = Vector{Ind}(undef, n_pop)
 
 			# Sort by rank
@@ -251,37 +244,45 @@ module WANN
 
 			# Elitism - keep best individuals unchanged
 			n_elites = floor(Int64, hyp["select_elite_ratio"] * n_pop)
-			for i in 1:n_elites
-				children[i] = pop.inds[i]
-			end
+			children[1:n_elites] = deepcopy(pop.inds[1:n_elites])
 
 			# Cull  - eliminate worst individuals from breeding pool
-			parents = parents[1:end - floor(Int64, hyp["select_cull_ratio"] * n_pop)]
+			n_cull = floor(Int64, hyp["select_cull_ratio"] * n_pop)
+			parents = parents[1:end-n_cull]
 
 			# Get parent pairs via tournament selection
 			# -- As individuals are sorted by fitness, index comparison is
 			# enough. In the case of ties the first individual wins
 			n_generate = n_pop - n_elites
-			parentA = rand(1:n_pop, n_generate, hyp["select_tourn_size"])
-			parentB = rand(1:n_pop, n_generate, hyp["select_tourn_size"])
-			parents = transpose(hcat(minimum(parentA, dims=2), minimum(parentB, dims=2)))
-			sort!(parents, dims=1)
+			parentA = rand(1:length(parents), n_generate, hyp["select_tourn_size"])
+			parentB = rand(1:length(parents), n_generate, hyp["select_tourn_size"])
+			parentAB = transpose(hcat(minimum(parentA, dims=2), minimum(parentB, dims=2)))
+			# println(size(parentA))
+			# println_matrix(parentA)
+			# println(size(parentB))
+			# println_matrix(parentB)
+			# println(size(parentAB))
+			# println_matrix(parentAB)
+			# exit()
+			sort!(parentAB, dims=1)
 
 			# Breed child population
 			for i in 1:n_generate
-				if rand() > hyp["prob_crossover"]
+				if hyp["prob_crossover"] <= rand()
 					# Mutation only: take only highest fit parent
-					child = copy(pop[parents[1, i]])
+					child = copy(parents[parentAB[1, i]])
 				else
 					# Crossover
 					throw(error("crossover is not impremented"))
 				end
+
 				mutate!(child)
 				children[n_elites + i] = child
 			end
 
 			pop.inds = children
 		end
+		println()
 		print("test for train data, ")
 		test(pop, test_func, data, ans)
 		print("test for test  data, ")
@@ -290,14 +291,38 @@ module WANN
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-	using LinearAlgebra: transpose!
-	using Flux: onehot
-	using Flux.Data.MNIST
 	using DataFrames # select
 	using CSV # read
+	using Statistics: mean
 
 	function main()
-		dataframe = CSV.read("data/sphere5.csv", header=true, delim=",")
+		n_pop = 100
+		n_sample = 100
+		n_generation = 20
+
+		function reward(output, ans)
+			return -mean(abs.(ans .- output) ./ ans)
+		end
+
+		function test(outputs, ans)
+			n_test = size(ans, 1)
+			diffs = []
+			for o in outputs
+				push!(diffs, mean(abs.(ans .- o) ./ ans))
+			end
+			println("avg diff : ", mean(diffs))
+		end
+
+		dataframe = CSV.read("domain/sphere/data/sphere5.csv", header=true, delim=",")
+		n_sample = min(n_sample, div(size(dataframe)[1], 5) * 4)
+		n_test = div(n_sample, 5)
+		in = convert(Matrix, select(dataframe, r"i"))
+		ans = convert(Matrix, select(dataframe, r"o"))
+		test_in = in[(n_sample - n_test + 1):n_sample, :]
+		test_ans = ans[(n_sample - n_test + 1):n_sample, :]
+		in = in[1:(n_sample - n_test), :]
+		ans = ans[1:(n_sample - n_test), :]
+
 		hyp = Dict(
 			"select_cull_ratio" => 0.2,
 			"select_elite_ratio"=> 0.2,
@@ -306,16 +331,21 @@ if abspath(PROGRAM_FILE) == @__FILE__
 			"alg_probMoo" => 0.8,
 			"prob_crossover" => 0.0
 		)
-		in = convert(Matrix, select(dataframe, r"i"))
-		ans = convert(Matrix, select(dataframe, r"o"))
-		n_test = div(size(dataframe)[2], 5)
-		in_test = in[end-n_test:end]
-		ans_test = ans[end-n_test:end]
-		in = in[1:end-n_test]
-		ans = ans[1:end-n_test]
-		pop = WANN.Pop(size(in, 2), size(ans, 2), 500, hyp["prob_initEnable"])
+
+		param_for_train = Dict(
+			"pop" => WANN.Pop(size(in, 2), size(ans, 2), n_pop, hyp["prob_initEnable"]),
+			"data" => in,
+			"ans" => ans,
+			"test_data" => test_in,
+			"test_ans" => test_ans,
+			"n_generation" => n_generation,
+			"reward" => reward,
+			"test" => test,
+			"hyp" => hyp,
+		)
+
 		println("train")
-		WANN.train(pop, in, ans, in_test, ans_test, 1000, hyp)
+		WANN.train(param_for_train)
 	end
 
 	main()

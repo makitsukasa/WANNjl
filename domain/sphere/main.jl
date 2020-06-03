@@ -4,14 +4,13 @@ using CSV # read
 using Statistics: mean
 
 n_pop = 1000
-n_generation = 1000
+n_generation = 10000
 
 function reward(output, ans)
 	return -mean(abs.(ans .- output) ./ ans)
 end
 
 function test(outputs, ans)
-	n_test = size(ans, 1)
 	diffs = []
 	for o in outputs
 		push!(diffs, mean(abs.(ans .- o) ./ ans))
@@ -24,13 +23,13 @@ n_sample = size(dataframe)[1]
 n_test = div(n_sample, 5)
 in = convert(Matrix, select(dataframe, r"i"))
 ans = convert(Matrix, select(dataframe, r"o"))
-test_in = in[end-n_test+1:end, 1:end]
-test_ans = ans[end-n_test+1:end, 1:end]
-in = in[1:end-n_test, 1:end]
-ans = ans[1:end-n_test, 1:end]
+test_in = in[(end - n_test + 1):end, :]
+test_ans = ans[(end - n_test + 1):end, :]
+in = in[1:(end - n_test), :]
+ans = ans[1:(end - n_test), :]
 
 hyp = Dict(
-	"select_cull_ratio" => 0.2,
+	"select_cull_ratio" => 0.,
 	"select_elite_ratio"=> 0.2,
 	"select_tourn_size" => 32,
 	"prob_initEnable" => 0.05,

@@ -75,6 +75,12 @@ function topological_sort(order::Vector{Int}, adjacency_matrix::Array{Bool, 2}, 
 	return ans
 end
 
+function normalize_0_1(v::Vector{T})::Vector{T} where T <: Number
+	min = minimum(v)
+	scale = maximum(v) - min
+	return [(i - min) / scale for i in v]
+end
+
 function get_shuffued_order(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int, nOut::Int,
