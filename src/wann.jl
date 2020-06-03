@@ -218,6 +218,18 @@ module WANN
 				pop.inds[i].rewards = deepcopy(rewards)
 				if isnan(sum(rewards)) || isinf(sum(rewards))
 					println("reward is invalid $rewards")
+					println("w")
+					println_matrix(pop.inds[i].w)
+					println("a")
+					println_matrix(pop.inds[i].a)
+					println("data")
+					println_matrix(data)
+					for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+						println("output when weight is $w")
+						println_matrix(calc_output(pop.inds[i], data, w))
+					end
+					println("ans")
+					println_matrix(ans)
 					exit()
 				end
 			end
