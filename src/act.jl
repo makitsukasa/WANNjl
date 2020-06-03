@@ -24,7 +24,7 @@ end
 
 
 mutable struct ActOrig <: Act
-	id::UInt
+	id::Int
 end
 
 ActOrig() = ActOrig(rand(1:11))
@@ -57,7 +57,9 @@ function get_function(act::ActOrig)
 end
 
 function mutate!(act::ActOrig)
-	act.id = rand(1:11)
+	candidate = collect(1:11)
+	deleteat!(candidate, act.id)
+	act.id = rand(candidate)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

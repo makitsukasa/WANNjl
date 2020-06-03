@@ -266,8 +266,8 @@ function mutate_addnode(
 	return get_assigned_v(v, order, special), get_assigned_a(a, order)
 end
 
-function mutate_act(a::Vector{<:Act})
-	mutate!(a[rand(1:length(a))])
+function mutate_act(a::Vector{<:Act}, mutable_indices)
+	mutate!(a[mutable_indices[rand(1:end)]])
 	return a
 end
 
