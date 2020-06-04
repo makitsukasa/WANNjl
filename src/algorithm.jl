@@ -10,6 +10,11 @@ function println_matrix(mat::Union{Core.AbstractArray,Core.AbstractArray})
 	println()
 end
 
+function println_matrix(p, mat::Union{Core.AbstractArray,Core.AbstractArray})
+	print_matrix(p, mat)
+	write(p, "\n")
+end
+
 function check_regal_matrix(v, nIn, nHid)
 	if length(findall(x -> x > 0, v)) == 0
 		println("irregal : no connection")
