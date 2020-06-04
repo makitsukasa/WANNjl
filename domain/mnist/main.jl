@@ -13,7 +13,7 @@ image_size = 16
 
 function reward(output, labels)
 	# softmax cross entropy
-	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 2)
+	softmax = mapslices(x -> exp.(x .+ 1e-7) ./ sum(exp.(x .+ 1e-7)), output, dims = 2)
 	return -sum(labels .* log.(softmax)) / n_sample
 end
 
@@ -22,8 +22,8 @@ function test(outputs, labels)
 	incorrect = 0
 	for o in outputs
 		for col in 1:size(o, 1)
-			output_label = argmax(o[col, 1:end])
-			ans_label = argmax(labels[col, 1:end])
+			output_label = argmax(o[col, :])
+			ans_label = argmax(labels[col, :])
 			if output_label == ans_label
 				correct += 1
 			else

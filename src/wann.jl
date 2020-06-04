@@ -212,13 +212,14 @@ module WANN
 		reward = param["reward"]
 		test_func = param["test"]
 		for i = 1:param["n_generation"]
-			println("gen ", i)
+			println("gen $i")
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
 			for i in 1:length(pop.inds)
 				rewards = calc_rewards(pop.inds[i], reward, data, ans)
 				pop.inds[i].reward_avg = mean(rewards)
 				pop.inds[i].rewards = deepcopy(rewards)
 				if isnan(sum(rewards)) || isinf(sum(rewards))
+					println("reward is invalid $rewards")
 					open("a.txt", "w") do fp
 						write(fp, "reward is invalid $rewards\n")
 						write(fp, "w\n")
@@ -249,8 +250,8 @@ module WANN
 			# println([a.id for a in pop.inds[3].a])
 			# println()
 
-			# if i in vcat([collect(1:50), collect(100:100:10000)]...)
-			if true
+			if i in vcat([1, 10, 20, 30, 40, 50,  collect(100:100:10000)]...)
+			# if true
 				print("test for train data, ")
 				test(pop, test_func, data, ans)
 				print("test for test  data, ")
