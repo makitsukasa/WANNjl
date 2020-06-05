@@ -1,10 +1,11 @@
+include("../../src/algorithm.jl")
 include("../../src/wann.jl")
 using DataFrames # select
 using CSV # read
 using Statistics: mean
 
 n_pop = 1000
-n_sample = 2^63 - 1
+n_sample = Inf
 n_generation = 10000
 
 function reward(output, ans)
