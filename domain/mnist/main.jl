@@ -1,3 +1,4 @@
+include("../../src/algorithm.jl")
 include("../../src/wann.jl")
 using LinearAlgebra: transpose!
 using Flux: onehot
@@ -13,6 +14,23 @@ image_size = 16
 function reward(output, labels)
 	# softmax cross entropy
 	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 2)
+	if isnan(sum(labels .* log.(softmax .+ 1e-7)))
+		println("reward is NaN")
+		open("b.txt", "w") do fp
+			write(fp, "reward is NaN")
+			write(fp, "output\n")
+			println_matrix(fp, output)
+			write(fp, "softmax\n")
+			println_matrix(fp, softmax)
+			write(fp, "log\n")
+			println_matrix(fp, log.(softmax .+ 1e-7))
+			write(fp, "labels .* log\n")
+			println_matrix(fp, labels .* log.(softmax .+ 1e-7))
+			write(fp, "sum\n")
+			write(fp, sum(labels .* log.(softmax .+ 1e-7)))
+		end
+		exit()
+	end
 	return -sum(labels .* log.(softmax .+ 1e-10)) / n_sample
 end
 
