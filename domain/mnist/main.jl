@@ -19,7 +19,7 @@ function reward(output, labels)
 		softmax_bigfloat = mapslices(x -> exp.(x) ./ sum(exp.(x)), output_bigfloat, dims = 2)
 		if isnan(sum(labels .* log.(softmax_bigfloat .+ eps())))
 			println("NaN")
-			println(typeof(sum(labels .* log.(softmax_bigfloat .+ eps())) / n_sample))kkkkkk
+			println(typeof(sum(labels .* log.(softmax_bigfloat .+ eps())) / n_sample))
 			exit()
 		end
 		return sum(labels .* log.(softmax_bigfloat .+ eps())) / n_sample
