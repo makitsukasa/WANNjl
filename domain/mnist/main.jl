@@ -15,10 +15,16 @@ function reward(output, labels)
 	# softmax cross entropy
 	softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), output, dims = 2)
 	if isnan(sum(labels .* log.(softmax .+ eps())))
-		o = convert(Matrix{BigFloat}, output)
-		softmax = mapslices(x -> exp.(x) ./ sum(exp.(x)), o, dims = 2)
+		output_bigfloat = convert(Matrix{BigFloat}, output)
+		softmax_bigfloat = mapslices(x -> exp.(x) ./ sum(exp.(x)), output_bigfloat, dims = 2)
+		if isnan(sum(labels .* log.(softmax_bigfloat .+ eps())))
+			println("NaN")
+			println(typeof(sum(labels .* log.(softmax_bigfloat .+ eps())) / n_sample))kkkkkk
+			exit()
+		end
+		return sum(labels .* log.(softmax_bigfloat .+ eps())) / n_sample
 	end
-	return -sum(labels .* log.(softmax .+ eps())) / n_sample
+	return sum(labels .* log.(softmax .+ eps())) / n_sample
 end
 
 function test(outputs, labels)
