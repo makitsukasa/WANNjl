@@ -81,6 +81,22 @@ function topological_sort(order::CartesianIndices{1}, adjacency_matrix::Array{Bo
 	return ans
 end
 
+function argrand(chance::Vector{<:Real})::CartesianIndex{1}
+	cumlative_sum = [0 for _ in 1:length(chance)]
+	chance_normalized = chance ./ sum(chance)
+	cumlative_sum[1] = chance_normalized[1]
+	for i in 2:length(chance)
+		cumlative_sum[i] = cumlative_sum[i - 1] + chance_normalized[i]
+	end
+	r = rand()
+	for i in CartesianIndices(1:length(chance))
+		if r < cumlative_sum[i]
+			return i
+		end
+	end
+	return CartesianIndex(length(chance))
+end
+
 function get_shuffued_order(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int, nOut::Int,
@@ -197,7 +213,26 @@ function get_random_connectable_index(
 		nHid::Int,
 		order::CartesianIndices{1})::CartesianIndex{2}
 	candidate = get_all_connectable_indices(v, nIn, nHid, order)
-	return candidate[rand(1:length(candidate))]
+	chance = [0.0 for _  in 1:length(candidate)]
+	for i in 1:length(candidate)
+		y = convert(Int, order[c[1]])
+		x = convert(Int, order[c[2]])
+		if x <= nIn + nHid
+			if y <= nIn # ih
+				chance[i] = 1
+			else        # hh
+				chance[i] = 3
+			end
+		else
+			if y <= nIn # io
+				chance[i] = 0.5
+			else        # ho
+				chance[i] = 1
+			end
+		end
+	end
+	# return candidate[rand(1:length(candidate))]
+	return candidate[argrand(chance)]
 end
 
 get_random_connectable_index(
