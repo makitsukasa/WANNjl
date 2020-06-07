@@ -62,7 +62,7 @@ module WANN
 	end
 
 	function mutate_act!(ind::Ind)
-		connected_indices = findall(!iszero, reshape(sum(ind.w, dims = 2), length(ind.a)))
+		connected_indices = findall(!iszero, reshape(sum(ind.w, dims = 2), size(ind.w, 2)))
 		ind.a = mutate_act(ind.a, connected_indices)
 	end
 
@@ -130,28 +130,29 @@ module WANN
 	function mutate!(ind::Ind)
 		r = rand()
 		if r < 0.25
-			# println(i, "addconn")
-			# println(ind.w)
-			check_regal_matrix(ind)
 			try
 				mutate_addconn!(ind)
+				check_regal_matrix(ind)
 			catch
-				println("no room")
-				# println_matrix(ind.w)
-				r = 1.0
+				# println("no room for connect")
+				mutate!(ind)
 			end
-			# println_matrix(ind.w)
-			check_regal_matrix(ind)
 		elseif r < 0.5
-			# println(i, "addnode")
-			# println(ind.w)
-			check_regal_matrix(ind)
-			mutate_addnode!(ind)
-			# println_matrix(ind.w)
-			check_regal_matrix(ind)
+			try
+				mutate_addnode!(ind)
+				check_regal_matrix(ind)
+			catch
+				# println("no connect for insert")
+				mutate!(ind)
+			end
 		elseif r < 1.0
-			mutate_act!(ind)
-			check_regal_matrix(ind)
+			try
+				mutate_act!(ind)
+				check_regal_matrix(ind)
+			catch
+				# println("no connect for mutate act")
+				mutate!(ind)
+			end
 		end
 	end
 
