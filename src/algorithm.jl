@@ -180,9 +180,9 @@ function get_all_connectable_indices(
 		order::CartesianIndices{1})::Vector{CartesianIndex{2}}
 	indices = findall(x -> x == 0, v)
 	ans = CartesianIndex{2}[]
-	for c in indices
-		y = convert(Int, order[c[1]])
-		x = convert(Int, order[c[2]])
+	for i in indices
+		y = convert(Int, order[i[1]])
+		x = convert(Int, order[i[2]])
 		# print("($x, $y) : ")
 		# ignore non-connectable
 		# reverse order
@@ -213,10 +213,12 @@ function get_random_connectable_index(
 		nHid::Int,
 		order::CartesianIndices{1})::CartesianIndex{2}
 	candidate = get_all_connectable_indices(v, nIn, nHid, order)
+	return candidate[rand(1:length(candidate))]
+
 	chance = [0.0 for _  in 1:length(candidate)]
 	for i in 1:length(candidate)
-		y = convert(Int, order[c[1]])
-		x = convert(Int, order[c[2]])
+		y = convert(Int, order[i[1]])
+		x = convert(Int, order[i[2]])
 		if x <= nIn + nHid
 			if y <= nIn # ih
 				chance[i] = 1
@@ -231,7 +233,6 @@ function get_random_connectable_index(
 			end
 		end
 	end
-	# return candidate[rand(1:length(candidate))]
 	return candidate[argrand(chance)]
 end
 
