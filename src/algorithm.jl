@@ -1,4 +1,4 @@
-using Random: shuffle!
+using Random: shuffle, shuffle!
 using Base: print_matrix
 using Statistics: normalize
 include("./act.jl")
@@ -57,7 +57,7 @@ function warshall(adjacency_matrix)
 end
 
 # Warshall's original algorithm by a bool adjacency matrix
-function topological_sort(order::CartesianIndices{1}, adjacency_matrix::Array{Bool, 2}, reachability_matrix::Array{Bool, 2})::CartesianIndices{1}
+function topological_sort(order::Vector{CartesianIndex{1}}, adjacency_matrix::Array{Bool, 2}, reachability_matrix::Array{Bool, 2})::Vector{CartesianIndex{1}}
 	# http://blog.gapotchenko.com/stable-topological-sort
 	n = length(order)
 	ans = deepcopy(order)
@@ -82,14 +82,14 @@ function topological_sort(order::CartesianIndices{1}, adjacency_matrix::Array{Bo
 end
 
 function argrand(chance::Vector{<:Real})::CartesianIndex{1}
-	cumlative_sum = [0 for _ in 1:length(chance)]
+	cumlative_sum = [0.0 for _ in 1:length(chance)]
 	chance_normalized = chance ./ sum(chance)
 	cumlative_sum[1] = chance_normalized[1]
 	for i in 2:length(chance)
 		cumlative_sum[i] = cumlative_sum[i - 1] + chance_normalized[i]
 	end
 	r = rand()
-	for i in CartesianIndices(1:length(chance))
+	for i in [CartesianIndex(i) for i in 1:length(chance)]
 		if r < cumlative_sum[i]
 			return i
 		end
@@ -97,22 +97,34 @@ function argrand(chance::Vector{<:Real})::CartesianIndex{1}
 	return CartesianIndex(length(chance))
 end
 
+function get_inv_order(order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{1}}
+	ans = CartesianIndex{1}[]
+	for i in 1:length(order)
+		try
+			push!(ans, convert(Int, findfirst(o -> o == i, order)))
+		catch
+			# do nothing
+		end
+	end
+	return ans
+end
+
 function get_shuffued_order(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int, nOut::Int,
-		orig_order::CartesianIndices{1})::CartesianIndices{1}
+		orig_order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{1}}
 	hid = orig_order[nIn+1:end-nOut]
 	shuffle!(hid)
 	return CartesianIndices([orig_order[1:nIn]; hid; orig_order[end-nOut+1:end]])
 end
 
-get_shuffued_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::CartesianIndices{1} =
-	get_shuffued_order(v, nIn, nOut, CartesianIndices(1:size(v,1)))
+get_shuffued_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{CartesianIndex{1}} =
+	get_shuffued_order(v, nIn, nOut, [CartesianIndex(i) for i in 1:size(v,1)])
 
 function get_sorted_order(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int, nOut::Int,
-		orig_order::CartesianIndices{1})::CartesianIndices{1}
+		orig_order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{1}}
 	n = size(v, 1)
 	adjacency_matrix = map(x-> x > 0, v)
 	reachability_matrix = warshall(adjacency_matrix)
@@ -120,12 +132,12 @@ function get_sorted_order(
 	# return 1:size(v,1)
 end
 
-get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::CartesianIndices{1} =
-	get_sorted_order(v, nIn, nOut, CartesianIndices(1:size(v,1)))
+get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{CartesianIndex{1}} =
+	get_sorted_order(v, nIn, nOut, [CartesianIndex(i) for i in 1:size(v,1)])
 
 	function get_assigned_v(
 		orig::Matrix{<:AbstractFloat},
-		order::CartesianIndices{1},
+		order::Vector{CartesianIndex{1}},
 		special::Dict{CartesianIndex{2}, <:AbstractFloat} = Dict{CartesianIndex{2}, <:AbstractFloat}(),
 		default::AbstractFloat = 0.0)::Matrix{<:AbstractFloat}
 	n = length(order)
@@ -151,7 +163,7 @@ get_assigned_v(orig::Matrix{<:AbstractFloat},
 
 function get_assigned_a(
 		orig::Vector{T},
-		order::CartesianIndices{1},
+		order::Vector{CartesianIndex{1}},
 		default::Function = () -> ActOrig())::Vector{T} where T<:Act
 	n = length(order)
 	ans = Array{T}(undef, n)
@@ -161,6 +173,27 @@ function get_assigned_a(
 		catch
 			ans[i] = default()
 		end
+	end
+	return ans
+end
+
+function get_assigned_u(
+		orig::Vector{CartesianIndex{2}},
+		order::Vector{CartesianIndex{1}},
+		special::Vector{CartesianIndex{2}} = CartesianIndex{2}[])::Vector{CartesianIndex{2}}
+	ans = CartesianIndex{2}[]
+	inv_order = get_inv_order(order)
+	for i in orig
+		try
+			y = convert(Int, inv_order[i[1]])
+			x = convert(Int, inv_order[i[2]])
+			push!(ans, CartesianIndex(y, x))
+		catch
+			# do nothing
+		end
+	end
+	for i in special
+		push!(ans, i)
 	end
 	return ans
 end
@@ -177,7 +210,7 @@ function get_all_connectable_indices(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int,
 		nHid::Int,
-		order::CartesianIndices{1})::Vector{CartesianIndex{2}}
+		order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{2}}
 	indices = findall(x -> x == 0, v)
 	ans = CartesianIndex{2}[]
 	for i in indices
@@ -211,7 +244,7 @@ function get_random_connectable_index(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int,
 		nHid::Int,
-		order::CartesianIndices{1})::CartesianIndex{2}
+		order::Vector{CartesianIndex{1}})::CartesianIndex{2}
 	candidate = get_all_connectable_indices(v, nIn, nHid, order)
 	return candidate[rand(1:length(candidate))]
 
@@ -240,10 +273,10 @@ get_random_connectable_index(
 		v::Matrix{<:AbstractFloat},
 		nIn::Int,
 		nHid::Int)::CartesianIndex{2} =
-	get_random_connectable_index(v, nIn, nHid, CartesianIndices(1:size(v,1)))
+	get_random_connectable_index(v, nIn, nHid, [CartesianIndex(i) for i in 1:size(v,1)])
 
 function init_addconn!(v::Matrix{<:AbstractFloat}, nIn, prob_enable)
-	candidate = get_all_connectable_indices(v, nIn, 0, CartesianIndices(1:size(v, 1)))
+	candidate = get_all_connectable_indices(v, nIn, 0, [CartesianIndex(i) for i in 1:size(v,1)])
 	for index in candidate
 		if rand() < prob_enable
 			v[index] = 1
@@ -258,9 +291,10 @@ end
 function mutate_addconn(
 		v::Matrix{<:AbstractFloat},
 		a::Vector{<:Act},
+		u::Vector{CartesianIndex{2}},
 		nIn::Int,
 		nHid::Int,
-		nOut::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}}
+		nOut::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}, Vector{CartesianIndex{2}}}
 	# shuhhle
 	order = get_shuffued_order(v, nIn, nOut)
 	# println("shuffled: ", order)
@@ -271,13 +305,34 @@ function mutate_addconn(
 	index = get_random_connectable_index(v, nIn, nHid, order)
 	# println("connect:   ", index)
 	# assign
-	return get_assigned_v(v, order, Dict([(index, 1.0)])), get_assigned_a(a, order)
+	return get_assigned_v(v, order, Dict([(index, 1.0)])), get_assigned_a(a, order), get_assigned_u(u, order)
+end
+
+function mutate_reviveconn(
+		v::Matrix{<:AbstractFloat},
+		a::Vector{<:Act},
+		u::Vector{CartesianIndex{2}},
+		nIn::Int,
+		nHid::Int,
+		nOut::Int)::Vector{CartesianIndex{2}}
+	for i in shuffle(1:length(u))
+		try
+			v[u[i]] = 1.0
+			order = get_sorted_order(v, nIn, nOut)
+			check_regal_matrix(v, nIn, nHid)
+			return get_assigned_v(v, order), get_assigned_a(a, order), get_assigned_u(deleteat(u, i), order)
+		catch
+			continue
+		end
+	end
+	throw(error("could not revive"))
 end
 
 function mutate_addnode(
 		v::Matrix{<:AbstractFloat},
 		a::Vector{<:Act},
-		nIn::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}}
+		u::Vector{CartesianIndex{2}},
+		nIn::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}, Vector{CartesianIndex{2}}}
 	# index
 	index = get_random_index(x -> x == 1, v)
 	src = index[1]
@@ -287,7 +342,7 @@ function mutate_addnode(
 	# order = [1, 2, 3, 0, 4, 5]
 	order_int = collect(1:size(v, 1))
 	insert!(order_int, new_node_index, 0)
-	order = CartesianIndices(order_int)
+	order = [CartesianIndex(o) for o in order_int]
 
 	# disable src->dst, enable src->new, new->dst
 	special = Dict{CartesianIndex{2}, AbstractFloat}(
@@ -298,7 +353,9 @@ function mutate_addnode(
 	# println("src:$src, dst:$dst, new:$new_node_index")
 
 	# assign
-	return get_assigned_v(v, order, special), get_assigned_a(a, order)
+	return get_assigned_v(v, order, special, 0.0),
+		get_assigned_a(a, order),
+		get_assigned_u(u, order, [CartesianIndex(src, dst+1)])
 end
 
 function mutate_act(a::Vector{<:Act}, mutable_indices)
@@ -433,14 +490,15 @@ if abspath(PROGRAM_FILE) == @__FILE__
 			0.0 0.0 0.0 0.0 0.0 0.0;
 		]
 		a = [ActOrig(1) for _ in 1:6]
+		u = CartesianIndex{2}[]
 		# v = mutate_addconn(v, 1 + 1, 1, 2)
 		# v = mutate_addnode(v, 1 + 1)
 		for i = 0:0
 			for _ in ([1:9, 1:5, 1:6])[i+1]
-				v, a = mutate_addconn(v, a, 3, i, 3)
+				v, a, u = mutate_addconn(v, a, u, 3, i, 3)
 				println_matrix(v)
 			end
-			v, a = mutate_addnode(v, a, 3)
+			v, a, u = mutate_addnode(v, a, u, 3)
 			println_matrix(v)
 		end
 		# v = mutate_addnode(v, 3)

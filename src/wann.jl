@@ -11,6 +11,7 @@ module WANN
 		nOut::Int64
 		w::Matrix{Float64} # weight
 		a::Vector{<:Act} # activation function
+		u::Vector{CartesianIndex{2}}
 		rewards::Vector{Float64}
 		reward_avg::Float64
 		rank::Int64
@@ -26,14 +27,13 @@ module WANN
 		end
 	end
 
-	Base.hash(i::Ind, h::UInt) = hash(i.a, hash(i.w, hash(:Ind, h)))
-	Base.:(==)(a::Ind, b::Ind) = Base.isequal(hash(a), hash(b))
 
-	Ind(nIn::Int64, nOut::Int64, w::Matrix{Float64}, a::Vector{<:Act}) =
+	Ind(nIn::Int64, nOut::Int64, w::Matrix{Float64}, a::Vector{<:Act}, u::Vector{CartesianIndex{2}}) =
 		Ind(nIn,
 			nOut,
-			deepcopy(w),
-			deepcopy(a),
+			w,
+			a,
+			u,
 			Float64[],
 			NaN,
 			2^63-1)
@@ -44,21 +44,28 @@ module WANN
 			nIn,
 			nOut,
 			zeros(Float64, n, n),
-			[ActOrig() for _ in 1:n])
+			[ActOrig() for _ in 1:n],
+			CartesianIndex{2}[])
 		init_addconn!(ind.w, nIn + 1, prob_enable)
 		return ind
 	end
 
-	copy(ind::Ind) = Ind(ind.nIn, ind.nOut, deepcopy(ind.w), deepcopy(ind.a))
+	Base.hash(i::Ind, h::UInt) = hash(i.a, hash(i.w, hash(:Ind, h)))
+	Base.:(==)(a::Ind, b::Ind) = Base.isequal(hash(a), hash(b))
+	copy(ind::Ind) = Ind(ind.nIn, ind.nOut, deepcopy(ind.w), deepcopy(ind.a), deepcopy(ind.u))
 
 	check_regal_matrix(ind::Ind) = check_regal_matrix(ind.w, ind.nIn + 1, ind.nHid)
 
 	function mutate_addconn!(ind::Ind)
-		ind.w, ind.a = mutate_addconn(ind.w, ind.a, ind.nIn + 1, ind.nHid, ind.nOut)
+		ind.w, ind.a, ind.u = mutate_addconn(ind.w, ind.a, ind.u, ind.nIn + 1, ind.nHid, ind.nOut)
+	end
+
+	function mutate_reviveconn!(ind::Ind)
+		ind.w, ind.a, ind.u = mutate_reviveconn(ind.w, ind.a, ind.u, ind.nIn, ind.nHid, ind.nOut)
 	end
 
 	function mutate_addnode!(ind::Ind)
-		ind.w, ind.a = mutate_addnode(ind.w, ind.a, ind.nIn + 1)
+		ind.w, ind.a, ind.u = mutate_addnode(ind.w, ind.a, ind.u, ind.nIn + 1)
 	end
 
 	function mutate_act!(ind::Ind)
@@ -129,29 +136,59 @@ module WANN
 
 	function mutate!(ind::Ind)
 		r = rand()
-		if r < 0.25
+		if r < 0.20
 			try
 				mutate_addconn!(ind)
 				check_regal_matrix(ind)
-			catch
-				# println("no room for connect")
-				mutate!(ind)
+			catch e
+				if hasfield(typeof(e), :msg) && e.msg == "no room"
+					# println("no room for connect")
+					mutate!(ind)
+				else
+					rethrow(e)
+				end
+			end
+		elseif r < 0.25
+			try
+				# println_matrix(ind.w)
+				# mutate_reviveconn!(ind)
+				check_regal_matrix(ind)
+				# println_matrix(ind.w)
+				# println()
+				# exit()
+			catch e
+				if hasfield(typeof(e), :msg) && e.msg == "could not revive"
+					# println("no candidate for revive")
+					mutate!(ind)
+				else
+					rethrow(e)
+				end
 			end
 		elseif r < 0.5
 			try
+				# println("before: ", ind.u)
 				mutate_addnode!(ind)
+				# println("after : ", ind.u)
 				check_regal_matrix(ind)
-			catch
-				# println("no connect for insert")
-				mutate!(ind)
+			catch e
+				if hasfield(typeof(e), :msg) && e.msg == "no candidate found"
+					# println("no connect for insert")
+					mutate!(ind)
+				else
+					rethrow(e)
+				end
 			end
 		elseif r < 1.0
 			try
 				mutate_act!(ind)
 				check_regal_matrix(ind)
-			catch
-				# println("no connect for mutate act")
-				mutate!(ind)
+			catch e
+				if hasfield(typeof(e), :msg) && e.msg == "no connect"
+					# println("no connect for mutate act")
+					mutate!(ind)
+				else
+					rethrow(e)
+				end
 			end
 		end
 	end
@@ -342,7 +379,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 	function main()
 		n_pop = 100
 		n_sample = 100
-		n_generation = 20
+		n_generation = 1000
 
 		function reward(output, ans)
 			return -mean(abs.(ans .- output) ./ ans)
