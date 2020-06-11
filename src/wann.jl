@@ -61,7 +61,7 @@ module WANN
 	end
 
 	function mutate_reviveconn!(ind::Ind)
-		ind.w, ind.a, ind.u = mutate_reviveconn(ind.w, ind.a, ind.u, ind.nIn, ind.nHid, ind.nOut)
+		ind.w, ind.a, ind.u = mutate_reviveconn(ind.w, ind.a, ind.u, ind.nIn + 1, ind.nHid, ind.nOut)
 	end
 
 	function mutate_addnode!(ind::Ind)
@@ -136,7 +136,7 @@ module WANN
 
 	function mutate!(ind::Ind)
 		r = rand()
-		if r < 0.20
+		if r < 0.25
 			try
 				mutate_addconn!(ind)
 				check_regal_matrix(ind)
@@ -151,8 +151,11 @@ module WANN
 		elseif r < 0.25
 			try
 				# println_matrix(ind.w)
-				# mutate_reviveconn!(ind)
+				# before = deepcopy(ind.w)
+				mutate_reviveconn!(ind)
 				check_regal_matrix(ind)
+				# println_matrix(before)
+				# println()
 				# println_matrix(ind.w)
 				# println()
 				# exit()
@@ -166,8 +169,9 @@ module WANN
 			end
 		elseif r < 0.5
 			try
-				# println("before: ", ind.u)
+				# before = deepcopy(ind.u)
 				mutate_addnode!(ind)
+				# println("before: ", before)
 				# println("after : ", ind.u)
 				check_regal_matrix(ind)
 			catch e

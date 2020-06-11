@@ -99,12 +99,13 @@ end
 
 function get_inv_order(order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{1}}
 	ans = CartesianIndex{1}[]
+	order_int = [convert(Int, i) for i in order]
 	for i in 1:length(order)
-		try
-			push!(ans, convert(Int, findfirst(o -> o == i, order)))
-		catch
-			# do nothing
+		index = findfirst(o -> o == i, order_int)
+		if index == nothing
+			continue
 		end
+		push!(ans, CartesianIndex(index))
 	end
 	return ans
 end
@@ -115,7 +116,7 @@ function get_shuffued_order(
 		orig_order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{1}}
 	hid = orig_order[nIn+1:end-nOut]
 	shuffle!(hid)
-	return CartesianIndices([orig_order[1:nIn]; hid; orig_order[end-nOut+1:end]])
+	return [orig_order[1:nIn]; hid; orig_order[end-nOut+1:end]]
 end
 
 get_shuffued_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{CartesianIndex{1}} =
@@ -129,17 +130,16 @@ function get_sorted_order(
 	adjacency_matrix = map(x-> x > 0, v)
 	reachability_matrix = warshall(adjacency_matrix)
 	return topological_sort(orig_order, adjacency_matrix, reachability_matrix)
-	# return 1:size(v,1)
 end
 
 get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{CartesianIndex{1}} =
 	get_sorted_order(v, nIn, nOut, [CartesianIndex(i) for i in 1:size(v,1)])
 
-	function get_assigned_v(
-		orig::Matrix{<:AbstractFloat},
+function get_assigned_v(
+		orig::Matrix{T},
 		order::Vector{CartesianIndex{1}},
-		special::Dict{CartesianIndex{2}, <:AbstractFloat} = Dict{CartesianIndex{2}, <:AbstractFloat}(),
-		default::AbstractFloat = 0.0)::Matrix{<:AbstractFloat}
+		special::Dict{CartesianIndex{2}, T},
+		default::T = 0.0)::Matrix{T} where T<:AbstractFloat
 	n = length(order)
 	ans = zeros((n, n))
 	for y = 1:n, x = 1:n
@@ -156,9 +156,9 @@ get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{Cartes
 	return ans
 end
 
-get_assigned_v(orig::Matrix{<:AbstractFloat},
-		special::Dict{CartesianIndex{2}, <:AbstractFloat} = Dict{CartesianIndex{2}, <:AbstractFloat}(),
-		default::AbstractFloat = 0.0)::Matrix{<:AbstractFloat} =
+get_assigned_v(orig::Matrix{T},
+		special::Dict{CartesianIndex{2}, T} = Dict{CartesianIndex{2}, T}(),
+		default::T = 0.0) where T<:AbstractFloat =
 	get_assigned_v(orig, collect(1:size(orig, 1)), special, default)
 
 function get_assigned_a(
@@ -184,13 +184,9 @@ function get_assigned_u(
 	ans = CartesianIndex{2}[]
 	inv_order = get_inv_order(order)
 	for i in orig
-		try
-			y = convert(Int, inv_order[i[1]])
-			x = convert(Int, inv_order[i[2]])
-			push!(ans, CartesianIndex(y, x))
-		catch
-			# do nothing
-		end
+		y = convert(Int, inv_order[i[1]])
+		x = convert(Int, inv_order[i[2]])
+		push!(ans, CartesianIndex(y, x))
 	end
 	for i in special
 		push!(ans, i)
@@ -314,25 +310,31 @@ function mutate_reviveconn(
 		u::Vector{CartesianIndex{2}},
 		nIn::Int,
 		nHid::Int,
-		nOut::Int)::Vector{CartesianIndex{2}}
+		nOut::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}, Vector{CartesianIndex{2}}}
 	for i in shuffle(1:length(u))
+		v_clone = deepcopy(v)
+		v_clone[u[i]] = 1.0
+		order = get_sorted_order(v_clone, nIn, nOut)
 		try
-			v[u[i]] = 1.0
-			order = get_sorted_order(v, nIn, nOut)
-			check_regal_matrix(v, nIn, nHid)
-			return get_assigned_v(v, order), get_assigned_a(a, order), get_assigned_u(deleteat(u, i), order)
+			check_regal_matrix(v_clone, nIn, nHid)
 		catch
 			continue
 		end
+		v[u[i]] = 1.0
+		order = get_sorted_order(v, nIn, nOut)
+		u = deleteat!(u, i)
+		return get_assigned_v(v, order, Dict{CartesianIndex{2}, Float64}(), 0.0),
+			get_assigned_a(a, order),
+			get_assigned_u(u, order)
 	end
 	throw(error("could not revive"))
 end
 
 function mutate_addnode(
-		v::Matrix{<:AbstractFloat},
+		v::Matrix{T},
 		a::Vector{<:Act},
 		u::Vector{CartesianIndex{2}},
-		nIn::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}, Vector{CartesianIndex{2}}}
+		nIn::Int)::Tuple{Matrix{T}, Vector{<:Act}, Vector{CartesianIndex{2}}} where T<:AbstractFloat
 	# index
 	index = get_random_index(x -> x == 1, v)
 	src = index[1]
@@ -345,7 +347,7 @@ function mutate_addnode(
 	order = [CartesianIndex(o) for o in order_int]
 
 	# disable src->dst, enable src->new, new->dst
-	special = Dict{CartesianIndex{2}, AbstractFloat}(
+	special = Dict{CartesianIndex{2}, T}(
 		CartesianIndex(src, dst+1) => 0.0,
 		CartesianIndex(src, new_node_index) => 1.0,
 		CartesianIndex(new_node_index, dst+1) => 1.0,
@@ -380,9 +382,9 @@ function get_fronts(objectives::Matrix{<:AbstractFloat})::Vector{Vector{Any}}
 			if (values1[p] >  values1[q] && values2[p] >  values2[q]) ||
 			   (values1[p] >= values1[q] && values2[p] >  values2[q]) ||
 			   (values1[p] >  values1[q] && values2[p] >= values2[q])
-			  if !(q in S[p])
-				push!(S[p], q)
-			  end
+				if !(q in S[p])
+					push!(S[p], q)
+				end
 			elseif (values1[q] >  values1[p] && values2[q] >  values2[p]) ||
 				   (values1[q] >= values1[p] && values2[q] >  values2[p]) ||
 				   (values1[q] >  values1[p] && values2[q] >= values2[p])
