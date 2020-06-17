@@ -4,11 +4,13 @@ using LinearAlgebra: transpose!
 using Flux: onehot
 using Flux.Data.MNIST
 using Images: imresize
+using Statistics: mean
 
 n_sample = 1000
 n_test_sample = 100
 n_pop = 960
-n_generation = 4096
+# n_generation = 4096
+n_generation = 70
 image_size = 16
 
 function reward(output, labels)
@@ -41,7 +43,9 @@ function test(outputs, labels)
 			end
 		end
 	end
-	println("acculacy late : ", correct / (correct + incorrect))
+
+	# println("acculacy late : $(correct / (correct + incorrect)), output : $(mean(outputs))")
+	return correct / (correct + incorrect)
 end
 
 # convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
@@ -60,26 +64,45 @@ transpose!(test_imgs, hcat(vec.(test_imgs_f)[1:n_test_sample, :]...))
 hoge = map(x -> onehot(x, 0:9), MNIST.labels(:test)[1:n_test_sample, :])
 test_labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_test_sample] for x = 1:10]...)
 
-hyp = Dict(
-	"select_cull_ratio" => 0.2,
-	"select_elite_ratio"=> 0.2,
-	"select_tourn_size" => 32,
-	"prob_initEnable" => 0.05,
-	"alg_probMoo" => 0.8,
-	"prob_crossover" => 0.0
-)
+for i in 1:100000
+	prob = [rand() rand() rand() 0]
+	prob = [p / sum(prob) for p in prob]
+	prob[1] = prob[1] * 4 / 5
+	prob[4] =  1 - sum(prob)
 
-param_for_train = Dict(
-	"pop" => WANN.Pop(image_size^2, 10, n_pop, hyp["prob_initEnable"]),
-	"data" => imgs,
-	"ans" => labels,
-	"test_data" => test_imgs,
-	"test_ans" => test_labels,
-	"n_generation" => n_generation,
-	"reward" => reward,
-	"test" => test,
-	"hyp" => hyp,
-)
+	hyp = Dict(
+		"select_cull_ratio" => 0.2,
+		"select_elite_ratio"=> 0.2,
+		"select_tourn_size" => 32,
+		"prob_initEnable" => 0.05,
+		"alg_probMoo" => 0.8,
+		"prob_crossover" => 0.0,
+		"prob_addnode" => prob[1],
+		"prob_reviveconn" => prob[4],
+		"prob_addconn" => prob[2],
+		"prob_mutateact" => prob[3],
+	)
 
-println("train")
-WANN.train(param_for_train)
+	param_for_train = Dict(
+		"pop" => WANN.Pop(image_size^2, 10, n_pop, hyp["prob_initEnable"]),
+		"data" => imgs,
+		"ans" => labels,
+		"test_data" => test_imgs,
+		"test_ans" => test_labels,
+		"n_generation" => n_generation,
+		"reward" => reward,
+		"test" => test,
+		"hyp" => hyp,
+	)
+
+	println("train")
+	ind = WANN.train(param_for_train)
+
+	r = WANN.calc_rewards(ind, reward, imgs, labels)
+	ac_rate = test([WANN.calc_output(ind, test_imgs, w) for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]], test_labels)
+
+	open("a.txt", "a") do fp
+		write(fp, "ac_rate:$ac_rate,reward:$(mean(r)),prob_addnode:$(hyp["prob_addnode"]), prob_reviveconn:$(hyp["prob_reviveconn"]), prob_addconn:$(hyp["prob_addconn"]), prob_mutateact:$(hyp["prob_mutateact"])\n")
+	end
+	println("ac_rate:$ac_rate,reward:$(mean(r)),prob_addnode:$(hyp["prob_addnode"]), prob_reviveconn:$(hyp["prob_reviveconn"]), prob_addconn:$(hyp["prob_addconn"]), prob_mutateact:$(hyp["prob_mutateact"])")
+end

@@ -11,6 +11,11 @@ function println_matrix(mat::Union{Core.AbstractArray,Core.AbstractArray})
 	println()
 end
 
+function println_matrix(mat::Union{Core.AbstractArray,Core.AbstractArray}, type::Type)
+	print_matrix(stdout, map(i -> convert(type, i), mat))
+	println()
+end
+
 function println_matrix(p, mat::Union{Core.AbstractArray,Core.AbstractArray})
 	print_matrix(p, mat)
 	write(p, "\n")
@@ -22,25 +27,25 @@ function check_regal_matrix(v, nIn, nHid)
 	# 	println_matrix(v)
 	# 	throw(error("irregal : no connection"))
 	# end
-	indices = findall(x -> x == 1, v)
+	indices = findall(x -> x != 0, v)
 	candidate = CartesianIndex{2}[]
 	for c in indices
 		y = c[1]
 		x = c[2]
 		# reverse order
 		if x <= y
-			println("irregal : x($x) <= y($y)")
-			println_matrix(v)
+			# println("irregal : x($x) <= y($y)")
+			# println_matrix(v)
 			throw(error("irregal : x <= y"))
 		# dst is input node
 		elseif x <= nIn
-			println("irregal : x($x) < nIn($nIn)")
-			println_matrix(v)
+			# println("irregal : x($x) < nIn($nIn)")
+			# println_matrix(v)
 			throw(error("irregal : x < nIn"))
 		# src is output node
 		elseif y > nIn + nHid
-			println("irregal : y($y) >= nIn + nHid($nIn + $nHid)")
-			println_matrix(v)
+			# println("irregal : y($y) >= nIn + nHid($nIn + $nHid)")
+			# println_matrix(v)
 			throw(error("irregal : y >= nIn + nHid"))
 		end
 	end
@@ -212,7 +217,7 @@ function get_all_connectable_indices(
 	for i in indices
 		y = convert(Int, order[i[1]])
 		x = convert(Int, order[i[2]])
-		# print("($x, $y) : ")
+		# print("($y, $x) : ")
 		# ignore non-connectable
 		# reverse order
 		if x <= y
@@ -313,6 +318,9 @@ function mutate_reviveconn(
 		nOut::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}, Vector{CartesianIndex{2}}}
 	for i in shuffle(1:length(u))
 		v_clone = deepcopy(v)
+		if v_clone[u[i]] != 0.0
+			continue
+		end
 		v_clone[u[i]] = 1.0
 		order = get_sorted_order(v_clone, nIn, nOut)
 		try
@@ -336,7 +344,7 @@ function mutate_addnode(
 		u::Vector{CartesianIndex{2}},
 		nIn::Int)::Tuple{Matrix{T}, Vector{<:Act}, Vector{CartesianIndex{2}}} where T<:AbstractFloat
 	# index
-	index = get_random_index(x -> x == 1, v)
+	index = get_random_index(x -> x != 0, v)
 	src = index[1]
 	dst = index[2]
 	new_node_index = nIn > src ? nIn + 1 : src + 1

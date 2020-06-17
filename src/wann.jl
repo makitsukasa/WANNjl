@@ -27,7 +27,6 @@ module WANN
 		end
 	end
 
-
 	Ind(nIn::Int64, nOut::Int64, w::Matrix{Float64}, a::Vector{<:Act}, u::Vector{CartesianIndex{2}}) =
 		Ind(nIn,
 			nOut,
@@ -134,21 +133,21 @@ module WANN
 	calc_rewards(ind::Ind, reward::Function, input::Matrix{<:AbstractFloat}, ans::Matrix{<:AbstractFloat}) =
 		calc_rewards(ind, reward, input, ans, [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0])
 
-	function mutate!(ind::Ind)
+	function mutate!(ind::Ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 		r = rand()
-		if r < 0.25
+		if r < prob_addconn
 			try
 				mutate_addconn!(ind)
 				check_regal_matrix(ind)
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no room"
 					# println("no room for connect")
-					mutate!(ind)
+					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
 			end
-		elseif r < 0.25
+		elseif r < prob_addconn + prob_reviveconn
 			try
 				# println_matrix(ind.w)
 				# before = deepcopy(ind.w)
@@ -162,12 +161,12 @@ module WANN
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "could not revive"
 					# println("no candidate for revive")
-					mutate!(ind)
+					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
 			end
-		elseif r < 0.5
+		elseif r < prob_addconn + prob_reviveconn + prob_addnode
 			try
 				# before = deepcopy(ind.u)
 				mutate_addnode!(ind)
@@ -177,19 +176,19 @@ module WANN
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no candidate found"
 					# println("no connect for insert")
-					mutate!(ind)
+					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
 			end
-		elseif r < 1.0
+		elseif r < prob_addconn + prob_reviveconn + prob_addnode + prob_mutateact
 			try
 				mutate_act!(ind)
 				check_regal_matrix(ind)
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no connect"
 					# println("no connect for mutate act")
-					mutate!(ind)
+					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
@@ -245,7 +244,7 @@ module WANN
 	end
 
 	function train(param)
-		pop = param["pop"]
+		pop = deepcopy(param["pop"])
 		data = param["data"]
 		ans = param["ans"]
 		test_data = param["test_data"]
@@ -277,7 +276,6 @@ module WANN
 						write(fp, "ans\n")
 						println_matrix(fp, ans)
 					end
-					exit()
 				end
 			end
 			sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
@@ -306,11 +304,11 @@ module WANN
 			children = Vector{Ind}(undef, n_pop)
 
 			# Sort by rank
-			sort!(pop.inds, lt = (a, b) -> a.rank < b.rank)
+			sort!(parents, lt = (a, b) -> a.rank < b.rank)
 
 			# Elitism - keep best individuals unchanged
 			n_elites = floor(Int64, hyp["select_elite_ratio"] * n_pop)
-			children[1:n_elites] = deepcopy(pop.inds[1:n_elites])
+			children[1:n_elites] = deepcopy(parents[1:n_elites])
 
 			# Cull  - eliminate worst individuals from breeding pool
 			n_cull = floor(Int64, hyp["select_cull_ratio"] * n_pop)
@@ -342,11 +340,11 @@ module WANN
 					throw(error("crossover is not impremented"))
 				end
 
-				mutate!(child)
+				mutate!(child, hyp["prob_addconn"], hyp["prob_reviveconn"], hyp["prob_addnode"], hyp["prob_mutateact"])
 				children[n_elites + i] = child
 			end
 
-			pop.inds = children
+			pop.inds = deepcopy(children)
 
 			# cnt = 0
 			# for a in 2:length(pop.inds)
@@ -371,6 +369,14 @@ module WANN
 		test(pop, test_func, data, ans)
 		print("test for test  data, ")
 		test(pop, test_func, test_data, test_ans)
+
+		for i in 1:length(pop.inds)
+			rewards = calc_rewards(pop.inds[i], reward, data, ans)
+			pop.inds[i].reward_avg = mean(rewards)
+			pop.inds[i].rewards = deepcopy(rewards)
+		end
+		sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
+		return pop.inds[1]
 	end
 end
 
@@ -414,7 +420,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
 			"select_tourn_size" => 32,
 			"prob_initEnable" => 0.05,
 			"alg_probMoo" => 0.8,
-			"prob_crossover" => 0.0
+			"prob_crossover" => 0.0,
+			"prob_addnode" => 0.2,
+			"prob_reviveconn" => 0.05,
+			"prob_addconn" => 0.45,
+			"prob_mutateact" => 0.3,
 		)
 
 		param_for_train = Dict(
