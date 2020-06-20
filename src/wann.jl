@@ -142,7 +142,7 @@ module WANN
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no room"
 					# println("no room for connect")
-					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
+					# mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
@@ -161,7 +161,7 @@ module WANN
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "could not revive"
 					# println("no candidate for revive")
-					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
+					# mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
@@ -176,7 +176,7 @@ module WANN
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no candidate found"
 					# println("no connect for insert")
-					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
+					# mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
@@ -188,7 +188,7 @@ module WANN
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no connect"
 					# println("no connect for mutate act")
-					mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
+					# mutate!(ind, prob_addconn, prob_reviveconn, prob_addnode, prob_mutateact)
 				else
 					rethrow(e)
 				end
@@ -261,7 +261,7 @@ module WANN
 				pop.inds[i].rewards = deepcopy(rewards)
 				if isnan(sum(rewards)) || isinf(sum(rewards))
 					println("reward is invalid $rewards")
-					open("a.txt", "w") do fp
+					open("hoge.txt", "w") do fp
 						write(fp, "reward is invalid $rewards\n")
 						write(fp, "w\n")
 						println_matrix(fp, pop.inds[i].w)
@@ -290,8 +290,9 @@ module WANN
 			# println([a.id for a in pop.inds[3].a])
 			# println()
 
-			if i in vcat([1, 10, 20, 30, 40, 50,  collect(100:100:10000)]...)
+			# if i in vcat([1, 10, 20, 30, 40, 50,  collect(100:100:10000)]...)
 			# if true
+			if false
 				print("test for train data, ")
 				test(pop, test_func, data, ans)
 				print("test for test  data, ")
