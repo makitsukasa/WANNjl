@@ -2,12 +2,11 @@ include("../../src/algorithm.jl")
 include("../../src/wann.jl")
 using LinearAlgebra: transpose!
 using Flux: onehot
-using Flux.Data.MNIST
-using Images: imresize
+using CSV # read
 using Statistics: mean
 
 n_sample = 1000
-n_test_sample = 100
+n_test = 100
 n_pop = 960
 # n_generation = 4096
 n_generation = 70
@@ -23,7 +22,7 @@ function reward(output, labels)
 		if isnan(sum(labels .* log.(softmax_bigfloat .+ eps())))
 			println("NaN")
 			println(typeof(sum(labels .* log.(softmax_bigfloat .+ eps())) / n_sample))
-			open(hoge.txt, "a") do fp
+			open("hoge.txt", "a") do fp
 				write(fp, "reward is NaN\n")
 				write(fp, "output\n")
 				println_matrix(fp, output)
@@ -55,21 +54,19 @@ function test(outputs, labels)
 	return correct / (correct + incorrect)
 end
 
-# convert Array{Array{ColorTypes.Gray{FixedPointNumbers.Normed{UInt8,8}},2},1} into Array{Float64,2}
-imgs = zeros(Float64, (n_sample, image_size^2))
-# imgs_f = convert(Vector{Matrix{Float64}}, MNIST.images(:train))
-imgs_f = convert(Vector{Matrix{Float64}}, map(i -> imresize(i, (image_size, image_size)), MNIST.images(:train)))
-transpose!(imgs, hcat(vec.(imgs_f)[1:n_sample, :]...))
-# convert Array{Int64,1} into Array{Flux.OneHotVector,2}
-hoge = map(x -> onehot(x, 0:9), MNIST.labels(:train)[1:n_sample, :])
-labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_sample] for x = 1:10]...)
-
-# same for test
-test_imgs = zeros(Float64, (n_test_sample, image_size^2))
-test_imgs_f = convert(Vector{Matrix{Float64}}, map(i -> imresize(i, (image_size, image_size)), MNIST.images(:test)))
-transpose!(test_imgs, hcat(vec.(test_imgs_f)[1:n_test_sample, :]...))
-hoge = map(x -> onehot(x, 0:9), MNIST.labels(:test)[1:n_test_sample, :])
-test_labels = hcat([[hoge[y][x] ? 1.0 : 0.0 for y = 1:n_test_sample] for x = 1:10]...)
+imgdata = CSV.read("domain/mnist/data/train_img.csv", header=false, delim=" ")
+labeldata = CSV.read("domain/mnist/data/train_label.csv", header=false, delim=" ")
+if n_sample + n_test > size(imgdata)[1]
+	println("n_sample + n_test > 60000")
+	exit()
+end
+imgs = convert(Matrix, imgdata)
+labels_onehot = map(x -> onehot(x, 0:9), convert(Matrix, labeldata))
+labels = hcat([[labels_onehot[y][x] ? 1.0 : 0.0 for y = 1:60000] for x = 1:10]...)
+test_imgs = imgs[end - n_test:end, :]
+test_labels = labels[end - n_test:end, :]
+imgs = imgs[1:n_sample, :]
+labels = labels[1:n_sample, :]
 
 for i in 1:1
 	# prob = [rand() rand() rand() 0]
