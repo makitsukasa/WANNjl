@@ -11,7 +11,7 @@ n_pop = 960
 # n_generation = 4096
 n_generation = 70
 image_size = 16
-file_name = "c.txt"
+file_name = "a.txt"
 
 function reward(output, labels)
 	# softmax cross entropy
@@ -50,7 +50,7 @@ function test(outputs, labels)
 		end
 	end
 
-	# println("acculacy late : $(correct / (correct + incorrect)), output : $(mean(outputs))")
+	println("acculacy late : $(correct / (correct + incorrect))")
 	return correct / (correct + incorrect)
 end
 

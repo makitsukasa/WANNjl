@@ -1,4 +1,5 @@
 module WANN
+	using Base.Threads
 	using LinearAlgebra: dot
 	using Statistics: mean, normalize
 	using Flux
@@ -255,7 +256,7 @@ module WANN
 		for i = 1:param["n_generation"]
 			println("gen $i")
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
-			for i in 1:length(pop.inds)
+			@threads for i in 1:length(pop.inds)
 				rewards = calc_rewards(pop.inds[i], reward, data, ans)
 				pop.inds[i].reward_avg = mean(rewards)
 				pop.inds[i].rewards = deepcopy(rewards)
@@ -290,9 +291,9 @@ module WANN
 			# println([a.id for a in pop.inds[3].a])
 			# println()
 
-			# if i in vcat([1, 10, 20, 30, 40, 50,  collect(100:100:10000)]...)
+			if i in vcat([1, 10, 20, 30, 40, 50,  collect(100:100:10000)]...)
 			# if true
-			if false
+			# if false
 				print("test for train data, ")
 				test(pop, test_func, data, ans)
 				print("test for test  data, ")
@@ -332,7 +333,7 @@ module WANN
 			sort!(parentAB, dims=1)
 
 			# Breed child population
-			for i in 1:n_generate
+			@threads for i in 1:n_generate
 				if hyp["prob_crossover"] <= rand()
 					# Mutation only: take only highest fit parent
 					child = copy(parents[parentAB[1, i]])
