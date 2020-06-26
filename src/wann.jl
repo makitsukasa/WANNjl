@@ -104,6 +104,39 @@ module WANN
 		return buff[:, (end - ind.nOut + 1):end]
 	end
 
+	function calc_output_(ind::Ind, input::Matrix{<:AbstractFloat}, shared_weight::AbstractFloat)
+		buff = zeros((axes(input, 1), ind.nNode))
+		buff[:, 1] .= 1 # bias
+		buff[:, 2:ind.nIn + 1] = input
+		l = ind.nIn + 2
+		while l <= ind.nNode
+			r = l
+			while r <= ind.nNode
+				if iszero(ind.w[l:r, l:r])
+					r += 1
+					continue
+				end
+				r -= 1
+				break
+			end
+			r = min(r, ind.nNode)
+			if l == r
+				b = buff * ind.w[:, l]
+				buff[:, l] = b .* shared_weight
+			else
+				b = buff * ind.w[:, l:r]
+				for i in l:r
+					buff[:, i] .= b[i - l + 1] .* shared_weight
+				end
+			end
+			if r == ind.nNode
+				break
+			end
+			l = r + 1
+		end
+		return buff[:, (end - ind.nOut + 1):end]
+	end
+
 	function calc_rewards(
 			ind::Ind,
 			reward::Function,
@@ -115,6 +148,17 @@ module WANN
 		rewards = Vector{T}(undef, n_run)
 		for i in 1:n_run
 			result = calc_output(ind, input, shared_weights[i])
+			# result_ = calc_output_(ind, input, shared_weights[i])
+			# if !isapprox(result, result_)
+			# 	println("calc_output is wrong")
+			# 	open("input.txt", "w") do fp
+			# 		println(fp, input)
+			# 	end
+			# 	open("ind.w.txt", "w") do fp
+			# 		println(fp, ind.w)
+			# 	end
+			# 	exit()
+			# end
 			rewards[i] = reward(result, ans)
 			# if rewards[i] == -1.0
 			# 	# println("input        : ", input)
@@ -139,7 +183,7 @@ module WANN
 		if r < prob_addconn
 			try
 				mutate_addconn!(ind)
-				check_regal_matrix(ind)
+				# check_regal_matrix(ind)
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no room"
 					# println("no room for connect")
@@ -153,7 +197,7 @@ module WANN
 				# println_matrix(ind.w)
 				# before = deepcopy(ind.w)
 				mutate_reviveconn!(ind)
-				check_regal_matrix(ind)
+				# check_regal_matrix(ind)
 				# println_matrix(before)
 				# println()
 				# println_matrix(ind.w)
@@ -173,7 +217,7 @@ module WANN
 				mutate_addnode!(ind)
 				# println("before: ", before)
 				# println("after : ", ind.u)
-				check_regal_matrix(ind)
+				# check_regal_matrix(ind)
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no candidate found"
 					# println("no connect for insert")
@@ -185,7 +229,7 @@ module WANN
 		elseif r < prob_addconn + prob_reviveconn + prob_addnode + prob_mutateact
 			try
 				mutate_act!(ind)
-				check_regal_matrix(ind)
+				# check_regal_matrix(ind)
 			catch e
 				if hasfield(typeof(e), :msg) && e.msg == "no connect"
 					# println("no connect for mutate act")
@@ -256,7 +300,7 @@ module WANN
 		for i = 1:param["n_generation"]
 			println("gen $i")
 			# result = zeros(Float64, axes(run(pop.inds[begin], data)))
-			@threads for i in 1:length(pop.inds)
+			for i in 1:length(pop.inds)
 				rewards = calc_rewards(pop.inds[i], reward, data, ans)
 				pop.inds[i].reward_avg = mean(rewards)
 				pop.inds[i].rewards = deepcopy(rewards)
@@ -291,7 +335,7 @@ module WANN
 			# println([a.id for a in pop.inds[3].a])
 			# println()
 
-			if i in vcat([1, 10, 20, 30, 40, 50,  collect(100:100:10000)]...)
+			if i in vcat([1, 10, 20, 30, 40, 50, 70, collect(100:100:10000)]...)
 			# if true
 			# if false
 				print("test for train data, ")
