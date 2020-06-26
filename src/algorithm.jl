@@ -77,7 +77,6 @@ function topological_sort(order::Vector{CartesianIndex{1}}, adjacency_matrix::Ar
 		i_on_j = reachability_matrix[i_th, j_th]
 		if j_on_i && i_on_j
 			throw(error("circular way found"))
-			exit(-1)
 		end
 		deleteat!(ans, i)
 		insert!(ans, j, i_th)
@@ -100,6 +99,17 @@ function argrand(chance::Vector{<:Real})::CartesianIndex{1}
 		end
 	end
 	return CartesianIndex(length(chance))
+end
+
+function apply_blacklist(a::Vector{T}, list::Vector{CartesianIndex{2}})::Vector{T} where T<:Any
+	ans = T[]
+	for i in a
+	  if i in list
+		continue
+	  end
+	  push!(ans, i)
+	end
+	return ans
 end
 
 function get_inv_order(order::Vector{CartesianIndex{1}})::Vector{CartesianIndex{1}}
@@ -143,8 +153,7 @@ get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{Cartes
 function get_assigned_v(
 		orig::Matrix{T},
 		order::Vector{CartesianIndex{1}},
-		special::Dict{CartesianIndex{2}, T},
-		default::T = 0.0)::Matrix{T} where T<:AbstractFloat
+		special::Dict{CartesianIndex{2}, T)::Matrix{T} where T<:AbstractFloat
 	n = length(order)
 	ans = zeros((n, n))
 	for y = 1:n, x = 1:n
@@ -162,9 +171,8 @@ function get_assigned_v(
 end
 
 get_assigned_v(orig::Matrix{T},
-		special::Dict{CartesianIndex{2}, T} = Dict{CartesianIndex{2}, T}(),
-		default::T = 0.0) where T<:AbstractFloat =
-	get_assigned_v(orig, collect(1:size(orig, 1)), special, default)
+		special::Dict{CartesianIndex{2}, T} = Dict{CartesianIndex{2}, T}()) where T<:AbstractFloat =
+	get_assigned_v(orig, collect(1:size(orig, 1)), special)
 
 function get_assigned_a(
 		orig::Vector{T},
@@ -201,6 +209,15 @@ end
 
 function get_random_index(f::Function, v::Matrix{<:AbstractFloat})::CartesianIndex{2}
 	candidate = findall(f, v)
+	if length(candidate) == 0
+		throw(error("no candidate found"))
+	end
+	return candidate[rand(1:length(candidate))]
+end
+
+function get_random_index(f::Function, blacklist::Vector{CartesianIndex{2}}, v::Matrix{<:AbstractFloat})::CartesianIndex{2}
+	candidate = findall(f, v)
+	candidate = apply_blacklist(candidate, blacklist)
 	if length(candidate) == 0
 		throw(error("no candidate found"))
 	end
@@ -317,19 +334,23 @@ function mutate_reviveconn(
 		nHid::Int,
 		nOut::Int)::Tuple{Matrix{<:AbstractFloat}, Vector{<:Act}, Vector{CartesianIndex{2}}}
 	for i in shuffle(1:length(u))
+		if v[u[i]] != 0.0
+			continue
+		end
 		v_clone = deepcopy(v)
-		if v_clone[u[i]] != 0.0
-			continue
-		end
 		v_clone[u[i]] = 1.0
-		order = get_sorted_order(v_clone, nIn, nOut)
+		order = []
 		try
+			order = get_sorted_order(v_clone, nIn, nOut)
 			check_regal_matrix(v_clone, nIn, nHid)
-		catch
-			continue
+		catch e
+			if hasfield(typeof(e), :msg) && (e.msg == "circular way found" || e.msg == "")
+				continue
+			else
+				rethrow(e)
+			end
 		end
-		v[u[i]] = 1.0
-		order = get_sorted_order(v, nIn, nOut)
+		v = v_clone
 		u = deleteat!(u, i)
 		return get_assigned_v(v, order, Dict{CartesianIndex{2}, Float64}(), 0.0),
 			get_assigned_a(a, order),
@@ -344,7 +365,7 @@ function mutate_addnode(
 		u::Vector{CartesianIndex{2}},
 		nIn::Int)::Tuple{Matrix{T}, Vector{<:Act}, Vector{CartesianIndex{2}}} where T<:AbstractFloat
 	# index
-	index = get_random_index(x -> x != 0, v)
+	index = get_random_index(x -> x != 0, u, v)
 	src = index[1]
 	dst = index[2]
 	new_node_index = nIn > src ? nIn + 1 : src + 1
