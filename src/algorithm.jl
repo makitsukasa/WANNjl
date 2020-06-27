@@ -154,11 +154,11 @@ function get_assigned_v(
 		orig::Matrix{T},
 		order::Vector{CartesianIndex{1}},
 		special::Dict{CartesianIndex{2}, T})::Matrix{T} where T<:AbstractFloat
-	dim_orig = size(orig, 2)
+	dim_orig = size(orig, 1)
 	dim_order = maximum(size(order))
 	p = zeros(dim_order, dim_orig)
 	for i in 1:dim_order
-		if order[i] == 0
+		if order[i] == CartesianIndex(0)
 			continue
 		else
 			p[i, order[i]] = 1.0
@@ -171,8 +171,10 @@ function get_assigned_v(
 	return ans
 end
 
-get_assigned_v(orig::Matrix{T},
-		special::Dict{CartesianIndex{2}, T} = Dict{CartesianIndex{2}, T}()) where T<:AbstractFloat =
+get_assigned_v(orig::Matrix{T}, order::Vector{CartesianIndex{1}}) where T<:AbstractFloat =
+	get_assigned_v(orig, order, Dict{CartesianIndex{2}, T}())
+
+get_assigned_v(orig::Matrix{T}, special::Dict{CartesianIndex{2}, T}) where T<:AbstractFloat =
 	get_assigned_v(orig, collect(1:size(orig, 1)), special)
 
 function get_assigned_a(
@@ -324,12 +326,6 @@ function mutate_addconn(
 	index = get_random_connectable_index(v, nIn, nHid, order)
 	# println("connect:   ", index)
 	# assign
-	x = get_assigned_v(v, order, Dict([(index, 1.0)]))
-	y = get_assigned_v_(v, order, Dict([(index, 1.0)]))
-	if x != y
-		println("assign v wrong")
-		exit()
-	end
 	return get_assigned_v(v, order, Dict([(index, 1.0)])), get_assigned_a(a, order), get_assigned_u(u, order)
 end
 
@@ -359,6 +355,7 @@ function mutate_reviveconn(
 		end
 		v = v_clone
 		u = deleteat!(u, i)
+
 		return get_assigned_v(v, order, Dict{CartesianIndex{2}, Float64}()),
 			get_assigned_a(a, order),
 			get_assigned_u(u, order)
