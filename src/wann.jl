@@ -288,6 +288,17 @@ module WANN
 		test_func(outputs, ans)
 	end
 
+	function test(pop::Pop, test_func, data, ans, w)
+		# sort!(pop.inds, lt = (a, b) -> a.reward_avg > b.reward_avg)
+		# ind = pop.inds[1]
+		outputs = []
+		for ind in pop.inds
+			o = calc_output(ind, data, w)
+			push!(outputs, o)
+		end
+		test_func(outputs, ans)
+	end
+
 	function train(param)
 		pop = deepcopy(param["pop"])
 		data = param["data"]
@@ -412,9 +423,13 @@ module WANN
 		end
 		println()
 		print("test for train data, ")
-		test(pop, test_func, data, ans)
+		for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+			test(pop, test_func, data, ans, w)
+		end
 		print("test for test  data, ")
-		test(pop, test_func, test_data, test_ans)
+		for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+			test(pop, test_func, test_data, test_ans)
+		end
 
 		for i in 1:length(pop.inds)
 			rewards = calc_rewards(pop.inds[i], reward, data, ans)

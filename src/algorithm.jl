@@ -154,26 +154,6 @@ function get_assigned_v(
 		orig::Matrix{T},
 		order::Vector{CartesianIndex{1}},
 		special::Dict{CartesianIndex{2}, T})::Matrix{T} where T<:AbstractFloat
-	n = length(order)
-	ans = zeros((n, n))
-	for y = 1:n, x = 1:n
-		if haskey(special, CartesianIndex(y, x))
-			ans[y, x] = special[CartesianIndex(y, x)]
-			continue
-		end
-		try
-			ans[y, x] = orig[order[y], order[x]]
-		catch
-			continue
-		end
-	end
-	return ans
-end
-
-function get_assigned_v_(
-		orig::Matrix{T},
-		order::Vector{CartesianIndex{1}},
-		special::Dict{CartesianIndex{2}, T})::Matrix{T} where T<:AbstractFloat
 	dim_orig = size(orig, 2)
 	dim_order = maximum(size(order))
 	p = zeros(dim_order, dim_orig)
@@ -181,7 +161,7 @@ function get_assigned_v_(
 		if order[i] == 0
 			continue
 		else
-			p[i, order[i]] = 1
+			p[i, order[i]] = 1.0
 		end
 	end
 	ans = p * orig * p'
