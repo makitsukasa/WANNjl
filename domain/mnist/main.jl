@@ -72,11 +72,12 @@ for i in 1:1
 	# prob = [rand() rand() rand() 0]
 	# prob = [p / sum(prob) for p in prob]
 
-	# prob_2 = rand() * 0.15
-	# prob = [0.85 prob_2 (0.15 - prob_2) 0]
+	# # prob_2 = rand() * 0.15
+	# # prob = [0.85 prob_2 (0.15 - prob_2) 0]
+
 	# prob[4] = prob[1] * rand() * rand()
 	# prob[1] = 0
-	# prob[1] =  1 - sum(prob)
+	# prob[1] = 1 - sum(prob)
 
 	# prob = [0.353 0.105 0.454 0.088]
 	prob = [0.2 0.25 0.5 0.05]
@@ -94,7 +95,7 @@ for i in 1:1
 		"prob_mutateact" => prob[3],
 	)
 
-	println("prob_addnode:$(hyp["prob_addnode"]), prob_reviveconn:$(hyp["prob_reviveconn"]), prob_addconn:$(hyp["prob_addconn"]), prob_mutateact:$(hyp["prob_mutateact"])")
+	println("n_generation: $n_generation, prob_addnode:$(hyp["prob_addnode"]), prob_reviveconn:$(hyp["prob_reviveconn"]), prob_addconn:$(hyp["prob_addconn"]), prob_mutateact:$(hyp["prob_mutateact"])")
 
 	param_for_train = Dict(
 		"pop" => WANN.Pop(image_size^2, 10, n_pop, hyp["prob_initEnable"]),

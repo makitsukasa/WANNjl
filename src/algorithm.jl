@@ -153,7 +153,7 @@ get_sorted_order(v::Matrix{<:AbstractFloat}, nIn::Int, nOut::Int)::Vector{Cartes
 function get_assigned_v(
 		orig::Matrix{T},
 		order::Vector{CartesianIndex{1}},
-		special::Dict{CartesianIndex{2}, T)::Matrix{T} where T<:AbstractFloat
+		special::Dict{CartesianIndex{2}, T})::Matrix{T} where T<:AbstractFloat
 	n = length(order)
 	ans = zeros((n, n))
 	for y = 1:n, x = 1:n
@@ -164,8 +164,29 @@ function get_assigned_v(
 		try
 			ans[y, x] = orig[order[y], order[x]]
 		catch
-			ans[y, x] = default
+			continue
 		end
+	end
+	return ans
+end
+
+function get_assigned_v_(
+		orig::Matrix{T},
+		order::Vector{CartesianIndex{1}},
+		special::Dict{CartesianIndex{2}, T})::Matrix{T} where T<:AbstractFloat
+	dim_orig = size(orig, 2)
+	dim_order = maximum(size(order))
+	p = zeros(dim_order, dim_orig)
+	for i in 1:dim_order
+		if order[i] == 0
+			continue
+		else
+			p[i, order[i]] = 1
+		end
+	end
+	ans = p * orig * p'
+	for (k, v) in special
+		ans[k] = v
 	end
 	return ans
 end
@@ -323,6 +344,12 @@ function mutate_addconn(
 	index = get_random_connectable_index(v, nIn, nHid, order)
 	# println("connect:   ", index)
 	# assign
+	x = get_assigned_v(v, order, Dict([(index, 1.0)]))
+	y = get_assigned_v_(v, order, Dict([(index, 1.0)]))
+	if x != y
+		println("assign v wrong")
+		exit()
+	end
 	return get_assigned_v(v, order, Dict([(index, 1.0)])), get_assigned_a(a, order), get_assigned_u(u, order)
 end
 
@@ -352,7 +379,7 @@ function mutate_reviveconn(
 		end
 		v = v_clone
 		u = deleteat!(u, i)
-		return get_assigned_v(v, order, Dict{CartesianIndex{2}, Float64}(), 0.0),
+		return get_assigned_v(v, order, Dict{CartesianIndex{2}, Float64}()),
 			get_assigned_a(a, order),
 			get_assigned_u(u, order)
 	end
@@ -384,7 +411,7 @@ function mutate_addnode(
 	# println("src:$src, dst:$dst, new:$new_node_index")
 
 	# assign
-	return get_assigned_v(v, order, special, 0.0),
+	return get_assigned_v(v, order, special),
 		get_assigned_a(a, order),
 		get_assigned_u(u, order, [CartesianIndex(src, dst+1)])
 end
