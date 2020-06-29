@@ -68,7 +68,7 @@ test_labels = labels[end - n_test:end, :]
 imgs = imgs[1:n_sample, :]
 labels = labels[1:n_sample, :]
 
-for i in 1:1
+for i in 1:100
 	# prob = [rand() rand() rand() 0]
 	# prob = [p / sum(prob) for p in prob]
 
@@ -113,10 +113,26 @@ for i in 1:1
 	ind = WANN.train(param_for_train)
 
 	r = WANN.calc_rewards(ind, reward, imgs, labels)
-	ac_rate = test([WANN.calc_output(ind, test_imgs, w) for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]], test_labels)
+	ac_rates = []
+	println("test best ind for train data")
+	for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+		print("w is $w, ")
+		o = WANN.calc_output(ind, imgs, w)
+		test([o], labels)
+	end
+	println("test best ind for test  data")
+	for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+		print("w is $w, ")
+		o = WANN.calc_output(ind, test_imgs, w)
+		a = test([o], test_labels)
+		push!(ac_rates, a)
+	end
+
+	text = "mean_ac_rate:$(mean(ac_rates)),max_ac_rate:$(maximum(ac_rates)),reward:$(mean(r)),prob_addnode:$(hyp["prob_addnode"]),prob_reviveconn:$(hyp["prob_reviveconn"]),prob_addconn:$(hyp["prob_addconn"]),prob_mutateact:$(hyp["prob_mutateact"])\n"
 
 	open(file_name, "a") do fp
-		write(fp, "ac_rate:$ac_rate,reward:$(mean(r)),prob_addnode:$(hyp["prob_addnode"]), prob_reviveconn:$(hyp["prob_reviveconn"]), prob_addconn:$(hyp["prob_addconn"]), prob_mutateact:$(hyp["prob_mutateact"])\n")
+		write(fp, text)
 	end
-	println("ac_rate:$ac_rate,reward:$(mean(r)),prob_addnode:$(hyp["prob_addnode"]), prob_reviveconn:$(hyp["prob_reviveconn"]), prob_addconn:$(hyp["prob_addconn"]), prob_mutateact:$(hyp["prob_mutateact"])")
+	println(text)
+
 end

@@ -81,25 +81,11 @@ module WANN
 
 	function calc_output(ind::Ind, input::Matrix{<:AbstractFloat}, shared_weight::AbstractFloat)
 		buff = zeros((axes(input, 1), ind.nNode))
-		# println("axes(buff): ", axes(buff))
-		# println("axes(buff[1, :]): ", axes(buff[:, 1]))
-		# println("axes(buff[2:ind.nIn+1, :]): ", axes(buff[:, 2:ind.nIn+1]))
 		buff[:, 1] .= 1 # bias
 		buff[:, 2:ind.nIn+1] = input
 		for i in (ind.nIn + 2):ind.nNode
 			b = buff * ind.w[:, i]
-			# println(size(buff), size(ind.w[:, i]), size(b))
 			buff[:, i] = call(ind.a[i], b) .* shared_weight
-			# println_matrix(buff)
-			# println()
-			# println_matrix(ind.w)
-			# println()
-			# println_matrix(ind.w[:, i])
-			# println()
-			# println_matrix(b)
-			# println()
-			# println_matrix(buff[:, i])
-			# exit()
 		end
 		return buff[:, (end - ind.nOut + 1):end]
 	end
@@ -346,9 +332,9 @@ module WANN
 			# println([a.id for a in pop.inds[3].a])
 			# println()
 
-			if i in vcat([1, 10, 20, 30, 40, 50, 70, collect(100:100:10000)]...)
+			# if i in vcat([1, 10, 20, 30, 40, 50, 70, collect(100:100:10000)]...)
 			# if true
-			# if false
+			if false
 				print("test for train data, ")
 				test(pop, test_func, data, ans)
 				print("test for test  data, ")
@@ -422,13 +408,15 @@ module WANN
 			# end
 		end
 		println()
-		print("test for train data, ")
+		println("test for train data")
 		for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
+			print("w is $w, ")
 			test(pop, test_func, data, ans, w)
 		end
-		print("test for test  data, ")
+		println("test for test  data")
 		for w in [-2.0, -1.0, -0.5, 0.5, 1.0, 2.0]
-			test(pop, test_func, test_data, test_ans)
+			print("w is $w, ")
+			test(pop, test_func, test_data, test_ans, w)
 		end
 
 		for i in 1:length(pop.inds)
